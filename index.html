@@ -2,14 +2,19 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/addons/p5.sound.min.js"></script>
     <script src="https://unpkg.com/ml5@0.12.2/dist/ml5.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;800&family=Sarabun:wght@700&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; display: flex; justify-content: center; align-items: center; background-color: #1e293b; overflow: hidden; font-family: 'Poppins', sans-serif; cursor: pointer; }
-        canvas { border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        #muteBtn { position: absolute; top: 20px; left: 20px; z-index: 10; padding: 10px 20px; font-size: 16px; font-weight: bold; border-radius: 10px; background: #ef4444; color: white; border: none; cursor: pointer; font-family: 'Poppins', sans-serif; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: 0.2s; }
+        /* touch-action: none; ป้องกันหน้าจอขยับตอนเด็กๆ ใช้นิ้วลากไม้กายสิทธิ์ */
+        body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #1e293b; overflow: hidden; font-family: 'Poppins', sans-serif; cursor: pointer; touch-action: none; }
+        
+        /* สั่งให้ Canvas ขยายเต็มจอมือถือ (95%) แต่ถ้าเปิดคอมจะไม่เกิน 640px */
+        canvas { width: 95vw; max-width: 640px; height: auto; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); touch-action: none; }
+        
+        #muteBtn { position: absolute; top: 10px; left: 10px; z-index: 10; padding: 8px 15px; font-size: 14px; font-weight: bold; border-radius: 8px; background: #ef4444; color: white; border: none; cursor: pointer; font-family: 'Poppins', sans-serif; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: 0.2s; }
         #muteBtn:hover { transform: scale(1.05); }
     </style>
 </head>
