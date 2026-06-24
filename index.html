@@ -29,32 +29,28 @@
     let score = 0, currentQuestion = 0, maxQuestions = 10;
     let targetWord = null, timeLeft = 8000, lastTime = 0;
     let currentChoices = [];
-    let sessionVocab = []; // คลังคำศัพท์เฉพาะรอบนั้นๆ
+    let sessionVocab = []; 
+    let vocabImages = {}; // ตัวแปรเก็บรูปภาพ
     
-    // คลังคำศัพท์เต็มจากบทเพลง 19 คำหลัก
     const vocabList = [
-        { word: 'body', emoji: '🧍' },
-        { word: 'head', emoji: '🧑' },
-        { word: 'hair', emoji: '💇' },
-        { word: 'face', emoji: '👦' },
-        { word: 'eye', emoji: '👁️' },
-        { word: 'ear', emoji: '👂' },
-        { word: 'nose', emoji: '👃' },
-        { word: 'mouth', emoji: '👄' },
-        { word: 'moustache', emoji: '🥸' },
-        { word: 'cheek', emoji: '😊' },
-        { word: 'chin', emoji: '🧑' },
-        { word: 'neck', emoji: '🧣' },
-        { word: 'shoulders', emoji: '🤷' },
-        { word: 'arm', emoji: '💪' },
-        { word: 'hand', emoji: '🖐️' },
-        { word: 'hips', emoji: '💃' },
-        { word: 'leg', emoji: '%;"> Leg' },
-        { word: 'knees', emoji: '🦵' },
-        { word: 'feet', emoji: '🦶' }
+        { word: 'body' }, { word: 'head' }, { word: 'hair' }, { word: 'face' },
+        { word: 'eye' }, { word: 'ear' }, { word: 'nose' }, { word: 'mouth' },
+        { word: 'moustache' }, { word: 'cheek' }, { word: 'chin' }, { word: 'neck' },
+        { word: 'shoulders' }, { word: 'arm' }, { word: 'hand' }, { word: 'hips' },
+        { word: 'leg' }, { word: 'knees' }, { word: 'feet' }
     ];
 
     let osc, env, fireworks = [];
+
+    // โหลดรูปภาพเตรียมไว้ก่อนเริ่มเกม
+    function preload() {
+        vocabList.forEach(v => {
+            vocabImages[v.word] = loadImage(v.word + '.png', 
+                img => console.log('Loaded: ' + v.word), 
+                err => console.log('Image not found: ' + v.word)
+            );
+        });
+    }
 
     function setup() {
         let cnv = createCanvas(640, 480);
@@ -90,10 +86,7 @@
             return;
         }
         
-        // ดึงคำศัพท์จากรอบเซสชันปัจจุบัน (มั่นใจได้ว่าไม่ซ้ำกันใน 10 ข้อ)
         targetWord = sessionVocab[currentQuestion];
-        
-        // สุ่มตัวหลอก 2 ตัวที่ไม่ซ้ำกับคำตอบปัจจุบัน
         let distractors = shuffle(vocabList.filter(v => v.word !== targetWord.word)).slice(0, 2);
         currentChoices = shuffle([targetWord, distractors[0], distractors[1]]);
 
@@ -108,7 +101,6 @@
         
         if (state === 'START') { 
             state = 'PLAY'; 
-            // เริ่มต้นสุ่มชุดคำศัพท์ 10 คำจาก 19 คำสำหรับรอบนี้
             sessionVocab = shuffle([...vocabList]).slice(0, maxQuestions);
             nextQuestion(); 
             document.getElementById('bgMusic').play().catch(e => console.log(e));
@@ -126,7 +118,6 @@
     
     function restartGame() {
         state = 'PLAY'; score = 0; currentQuestion = 0; fireworks = []; 
-        // สุ่มชุดคำศัพท์ใหม่แกะกล่อง 10 คำ
         sessionVocab = shuffle([...vocabList]).slice(0, maxQuestions);
         document.getElementById('bgMusic').currentTime = 0;
         document.getElementById('bgMusic').play().catch(e => console.log(e));
@@ -187,8 +178,17 @@
         let seconds = Math.ceil(timeLeft / 1000);
         textAlign(CENTER, TOP); textSize(30); fill(255); text(`Time: ${seconds}s`, width/2, 60);
 
-        textAlign(CENTER, CENTER); textSize(120);
-        text(targetWord.emoji, width/2, height/2 - 40);
+        // แสดงรูปภาพที่อัปโหลดตรงกลางจอ
+        let img = vocabImages[targetWord.word];
+        if (img) {
+            imageMode(CENTER);
+            image(img, width/2, height/2 - 40, 180, 180); // ปรับขนาดรูปตรงเลข 180, 180 ได้ครับ
+            imageMode(CORNER);
+        } else {
+            // ถ้ายังไม่ได้อัปโหลดรูป จะแสดงข้อความแทนชั่วคราว
+            textAlign(CENTER, CENTER); textSize(40); fill(255, 255, 255, 150);
+            text("[ กำลังรอรูป " + targetWord.word + ".png ]", width/2, height/2 - 40);
+        }
 
         let boxW = 160, boxH = 60, gap = 20;
         let startX = (width - (3 * boxW + 2 * gap)) / 2;
