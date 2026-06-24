@@ -35,9 +35,11 @@
     let sessionVocab = []; 
     let vocabImages = {}; 
     
-    // ระบบเซ็นเซอร์และกันคลิกซ้อน
+    // ระบบเซ็นเซอร์และหลอดโหลด (Hover)
     let sensorX = -1, sensorY = -1;
-    let inputCooldown = 0; // หน่วงเวลากันเด็กแช่มือค้าง
+    let inputCooldown = 0; 
+    let hoverTime = [0, 0, 0]; // เก็บเวลาที่มือแช่อยู่บนแต่ละปุ่ม
+    const HOVER_THRESHOLD = 1500; // แช่มือ 1.5 วินาที
     
     const vocabList = [
         { word: 'body' }, { word: 'head' }, { word: 'hair' }, { word: 'face' },
@@ -97,8 +99,9 @@
         lastTime = millis();
         currentQuestion++;
         
-        // หน่วงเวลา 1 วินาทีหลังจากเปลี่ยนข้อ ป้องกันมือค้างรันยาว
-        inputCooldown = millis() + 1000; 
+        // รีเซ็ตเวลาโหลด
+        hoverTime = [0, 0, 0];
+        inputCooldown = millis() + 500; // พักเบรกสั้นๆ 0.5 วิ ก่อนเริ่มจับข้อใหม่
     }
 
     function mousePressed(event) {
@@ -139,7 +142,6 @@
             let pose = poses[0].pose;
             let lw = pose.leftWrist;
             let rw = pose.rightWrist;
-            // เพิ่มเกณฑ์ความแม่นยำเป็น 0.4 (จากเดิม 0.2) กล้องจะได้ไม่จับจุดมั่ว
             if (lw.confidence > 0.4 || rw.confidence > 0.4) {
                 return (lw.confidence > rw.confidence) ? lw : rw;
             }
@@ -165,7 +167,6 @@
 
     function drawSensor() {
         if (sensorX !== -1 && sensorY !== -1) {
-            // ถ้าระบบยังอยู่ในช่วงพัก Cooldown จะเป็นสีเทา ถ้าพร้อมเล่นจะเป็นสีส้ม
             if (millis() < inputCooldown) {
                 fill(150, 150, 150, 150); 
             } else {
@@ -181,7 +182,6 @@
         let dt = millis() - lastTime;
         lastTime = millis();
         
-        // ถ้าระบบพักอยู่ ให้หยุดเวลาและหยุดการทำงานทั้งหมดชั่วคราว (1 วินาที)
         if (millis() < inputCooldown) return;
 
         timeLeft -= dt;
@@ -199,7 +199,6 @@
         }
 
         if (tx !== -1 && ty !== -1) {
-            // ระบบ Smoothing (lerp) ทำให้จุดสีส้มวิ่งเนียนๆ ไม่กระตุก
             if (sensorX === -1) { 
                 sensorX = tx; sensorY = ty; 
             } else { 
@@ -208,18 +207,25 @@
             }
 
             for (let i = 0; i < 3; i++) {
-                if (abs(sensorX - currentChoices[i].cx) < 80 && abs(sensorY - currentChoices[i].cy) < 40) { 
-                    if (currentChoices[i].word === targetWord.word) {
-                        score++; playSound('correct');
-                    } else {
-                        playSound('wrong');
+                // ขยาย Hitbox ตรวจจับให้ใหญ่กว่าปุ่มจริง (กว้าง 200 สูง 100)
+                if (abs(sensorX - currentChoices[i].cx) < 100 && abs(sensorY - currentChoices[i].cy) < 50) { 
+                    hoverTime[i] += dt; // เพิ่มเวลาโหลด
+                    if (hoverTime[i] >= HOVER_THRESHOLD) { // ถ้าโหลดเต็ม
+                        if (currentChoices[i].word === targetWord.word) {
+                            score++; playSound('correct');
+                        } else {
+                            playSound('wrong');
+                        }
+                        nextQuestion();
+                        return;
                     }
-                    nextQuestion();
-                    return;
+                } else {
+                    hoverTime[i] = max(0, hoverTime[i] - dt * 2); // ถ้าเอามือออก หลอดจะค่อยๆ ลดลง
                 }
             }
         } else {
-            sensorX = -1; // รีเซ็ตตำแหน่งถ้าหากล้องไม่เจอมือ
+            sensorX = -1; 
+            for (let i=0; i<3; i++) hoverTime[i] = max(0, hoverTime[i] - dt * 2);
         }
     }
 
@@ -233,11 +239,11 @@
         let img = vocabImages[targetWord.word];
         if (img && img.width > 0) {
             imageMode(CENTER);
-            image(img, width/2, height/2 - 40, 180, 180); 
+            image(img, width/2, height/2 - 50, 180, 180); 
             imageMode(CORNER);
         } else {
             textAlign(CENTER, CENTER); textSize(40); fill(255, 255, 255, 150);
-            text("[ รูป " + targetWord.word + ".png ]", width/2, height/2 - 40);
+            text("[ รูป " + targetWord.word + ".png ]", width/2, height/2 - 50);
         }
 
         let boxW = 160, boxH = 60, gap = 20;
@@ -248,8 +254,24 @@
             let cy = height - 80;
             currentChoices[i].cx = cx; currentChoices[i].cy = cy;
 
-            rectMode(CENTER); fill(255, 255, 255, 200); stroke(0); strokeWeight(2);
+            // คํานวณเปอร์เซ็นต์หลอดโหลด (0 ถึง 1)
+            let progress = constrain(hoverTime[i] / HOVER_THRESHOLD, 0, 1);
+
+            rectMode(CENTER); 
+            // 1. วาดพื้นหลังกล่อง
+            fill(255, 255, 255, 200); stroke(0); strokeWeight(2);
             rect(cx, cy, boxW, boxH, 15);
+            
+            // 2. วาดหลอดพลังสีเขียวทับซ้อน (ตามระยะเวลาที่แช่มือ)
+            if (progress > 0) {
+                rectMode(CORNER);
+                fill(16, 185, 129, 180); // สีเขียวโปร่งแสง
+                noStroke();
+                rect(cx - boxW/2, cy - boxH/2, boxW * progress, boxH, 15);
+                rectMode(CENTER);
+            }
+
+            // 3. วาดข้อความคำศัพท์
             fill(0); noStroke(); textSize(24); textAlign(CENTER, CENTER);
             text(currentChoices[i].word.toUpperCase(), cx, cy);
             rectMode(CORNER);
