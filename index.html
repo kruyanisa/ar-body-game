@@ -39,7 +39,6 @@
     
     let smoothedSensorPos = [0, 0];
     
-    // ระบบหน่วงเวลาโชว์เฉลย (Feedback System)
     let isFeedbackState = false;
     let feedbackTimer = 0;
     let selectedButtonIndex = -1;
@@ -108,7 +107,6 @@
         lastTime = millis();
         currentQuestion++;
         
-        // รีเซ็ตค่าสถานะเฉลย
         isFeedbackState = false;
         selectedButtonIndex = -1;
     }
@@ -166,10 +164,9 @@
         let dt = millis() - lastTime;
         lastTime = millis();
 
-        // ถ้าอยู่ในช่วงหน่วงเวลาโชว์เฉลย ให้จับเวลาถอยหลังอย่างเดียว ไม่รับคำสั่งมือถือ/กล้อง
         if (isFeedbackState) {
             if (millis() > feedbackTimer) {
-                nextQuestion(); // หมดเวลาหน่วง ข้ามไปข้อต่อไป
+                nextQuestion(); 
             }
             return; 
         }
@@ -187,7 +184,7 @@
             
             if (lw.confidence > 0.4 || rw.confidence > 0.4) {
                 let activeWrist = (lw.confidence > rw.confidence) ? lw : rw;
-                sensorPos = [width - activeWrist.x, activeWrist.y - 80]; // ชดเชยจุดขึ้นไปตรงฝ่ามือ
+                sensorPos = [width - activeWrist.x, activeWrist.y - 80]; 
                 active = true;
             }
         }
@@ -196,7 +193,6 @@
             smoothedSensorPos[0] = lerp(smoothedSensorPos[0], sensorPos[0], 0.3);
             smoothedSensorPos[1] = lerp(smoothedSensorPos[1], sensorPos[1], 0.3);
 
-            // ตรวจจับการชนปุ่ม (แตะปุ๊บติดปั๊บ)
             for (let i = 0; i < 3; i++) {
                 let hitW = currentChoices[i].hitW || 120;
                 let hitH = currentChoices[i].hitH || 60;
@@ -212,7 +208,7 @@
                         isCorrectAnswer = false;
                     }
                     
-                    // เปิดใช้งานสถานะหน่วงเวลา 1.5 วินาที (1500 มิลลิวินาที)
+                    // หน่วงเวลาโชว์เฉลย 1.5 วินาที
                     isFeedbackState = true;
                     feedbackTimer = millis() + 1500; 
                     return; 
@@ -222,20 +218,22 @@
     }
 
     function drawGameUI() {
-        fill(255); textAlign(LEFT, TOP); textSize(24); textStyle(BOLD); text(`Score: ${score}`, 20, 80); 
-        textAlign(RIGHT, TOP); text(`${currentQuestion} / ${maxQuestions}`, width - 20, 80);
+        // ย้ายคะแนนและเวลามาไว้ชิดขอบบนสุด เพื่อหลีกทางให้ปุ่ม
+        fill(255); textAlign(LEFT, TOP); textSize(24); textStyle(BOLD); text(`Score: ${score}`, 20, 30); 
+        textAlign(RIGHT, TOP); text(`${currentQuestion} / ${maxQuestions}`, width - 20, 30);
         
         let seconds = Math.ceil(timeLeft / 1000);
-        textAlign(CENTER, TOP); textSize(30); fill(255); text(`Time: ${seconds}s`, width/2, 80);
+        textAlign(CENTER, TOP); textSize(30); fill(255); text(`Time: ${seconds}s`, width/2, 30);
 
+        // ย้ายรูปภาพไปด้านล่าง
         let img = vocabImages[targetWord.word];
         if (img && img.width > 0) {
             imageMode(CENTER);
-            image(img, width/2, height/2 - 40, 180, 180); 
+            image(img, width/2, height - 130, 180, 180); 
             imageMode(CORNER);
         } else {
             textAlign(CENTER, CENTER); textSize(40); fill(255, 255, 255, 150);
-            text("[ รูป " + targetWord.word + ".png ]", width/2, height/2 - 40);
+            text("[ รูป " + targetWord.word + ".png ]", width/2, height - 130);
         }
 
         let screenPadding = width * 0.05; 
@@ -246,9 +244,10 @@
         let gap = (availableWidth - (boxW * 3)) / 2; 
         let startX = screenPadding; 
 
+        // ย้ายปุ่มคำตอบมาด้านบน (ใต้ตัวเลขคะแนน)
         for (let i = 0; i < 3; i++) {
             let cx = startX + i * (boxW + gap) + boxW / 2;
-            let cy = height - boxH - 40; 
+            let cy = 130; 
             
             currentChoices[i].cx = cx; 
             currentChoices[i].cy = cy;
@@ -257,21 +256,19 @@
 
             rectMode(CENTER); 
             
-            // --- ระบบเปลี่ยนสีปุ่มเฉลยตอนตอบ ---
             if (isFeedbackState && i === selectedButtonIndex) {
                 if (isCorrectAnswer) {
-                    fill(46, 204, 113); // ตอบถูก เปลี่ยนเป็นสีเขียวเด่นชัด
+                    fill(46, 204, 113); 
                 } else {
-                    fill(231, 76, 60); // ตอบผิด เปลี่ยนเป็นสีแดง
+                    fill(231, 76, 60); 
                 }
             } else {
-                fill(255, 255, 255, 240); // สีขาวปกติระหว่างเล่น
+                fill(255, 255, 255, 240); 
             }
             
             stroke(0); strokeWeight(2);
             rect(cx, cy, boxW, boxH, 15);
 
-            // ตัวหนังสือในปุ่ม (ถ้าปุ่มเปลี่ยนสี ตัวหนังสือจะเปลี่ยนเป็นสีขาวเพื่อให้มองง่าย)
             if (isFeedbackState && i === selectedButtonIndex) fill(255);
             else fill(0);
             
@@ -286,7 +283,6 @@
         fill(c); textSize(size); text(t1, x, y - 30); fill(255); textSize(20); text(t2, x, y + 40);
     }
 
-    // ฟังก์ชันสลับอาร์เรย์
     function shuffle(array) {
         let currentIndex = array.length, randomIndex;
         while (currentIndex !== 0) {
