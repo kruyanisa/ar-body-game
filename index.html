@@ -13,6 +13,7 @@
 </head>
 <body>
     <audio id="bgMusic" loop src="Poosaokalor.mp3"></audio>
+    <button id="muteBtn" style="position: absolute; top: 20px; left: 20px; z-index: 10; padding: 10px 20px; font-size: 16px; font-weight: bold; border-radius: 10px; background: #ef4444; color: white; border: none; cursor: pointer; font-family: 'Poppins', sans-serif;">🔊 Mute</button>
 <script>
     let video, poseNet, poses = [];
     let state = 'START'; // START, PLAY, END
@@ -195,6 +196,18 @@ function mousePressed() {
             if (fireworks[i].alpha <= 0) fireworks.splice(i, 1);
         }
     }
+    document.getElementById('muteBtn').addEventListener('click', function() {
+        let music = document.getElementById('bgMusic');
+        if (music.paused) {
+            music.play();
+            this.innerText = "🔊 Mute";
+            this.style.background = "#ef4444";
+        } else {
+            music.pause();
+            this.innerText = "🔇 Play";
+            this.style.background = "#10b981";
+        }
+    });
 </script>
 </body>
 </html>
