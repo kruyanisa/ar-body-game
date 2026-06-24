@@ -8,17 +8,20 @@
     <script src="https://unpkg.com/ml5@0.12.2/dist/ml5.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;800&family=Sarabun:wght@700&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #1e293b; overflow: hidden; font-family: 'Poppins', 'Sarabun', sans-serif; touch-action: none; }
-        #game-container { position: relative; width: 95%; max-width: 800px; aspect-ratio: 4/3; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        canvas { width: 100% !important; height: 100% !important; border-radius: 15px; display: block; touch-action: none; }
-        .btn { position: absolute; z-index: 10; padding: 8px 12px; font-size: 14px; font-weight: bold; border-radius: 8px; color: white; border: none; cursor: pointer; font-family: 'Sarabun', sans-serif; transition: 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        /* ล้างขอบหน้าจอและเซ็ตให้เต็ม 100% */
+        body { margin: 0; padding: 0; background-color: #1e293b; overflow: hidden; font-family: 'Poppins', 'Sarabun', sans-serif; touch-action: none; }
+        #game-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; }
+        canvas { display: block; touch-action: none; }
+        
+        .btn { position: absolute; z-index: 10; padding: 10px 15px; font-size: 16px; font-weight: bold; border-radius: 8px; color: white; border: none; cursor: pointer; font-family: 'Sarabun', sans-serif; transition: 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         .btn:hover { transform: scale(1.05); }
-        #muteBtn { top: 15px; left: 15px; background: #ef4444; }
-        #restartBtn { top: 15px; right: 100px; background: #3b82f6; }
-        #endBtn { top: 15px; right: 15px; background: #64748b; }
+        #muteBtn { top: 20px; left: 20px; background: #ef4444; }
+        #restartBtn { top: 20px; right: 120px; background: #3b82f6; }
+        #endBtn { top: 20px; right: 20px; background: #64748b; }
     </style>
 </head>
 <body>
+    
     <div id="game-container">
         <audio id="bgMusic" loop src="Poosaokalor.mp3"></audio>
         <button id="muteBtn" class="btn" onclick="toggleMute()">🔊 Mute</button>
@@ -35,12 +38,9 @@
     let sessionVocab = []; 
     let vocabImages = {}; 
     
-    // ระบบเซ็นเซอร์และหลอดโหลด (Hover)
-    let sensorX = -1, sensorY = -1;
-    let inputCooldown = 0; 
-    let hoverTime = [0, 0, 0]; // เก็บเวลาที่มือแช่อยู่บนแต่ละปุ่ม
-    const HOVER_THRESHOLD = 1500; // แช่มือ 1.5 วินาที
-    
+    let smoothedSensorPos = [0, 0];
+    let selectionCooldown = 0; 
+
     const vocabList = [
         { word: 'body' }, { word: 'head' }, { word: 'hair' }, { word: 'face' },
         { word: 'eye' }, { word: 'ear' }, { word: 'nose' }, { word: 'mouth' },
@@ -58,12 +58,13 @@
     }
 
     function setup() {
-        let cnv = createCanvas(640, 480);
+        // ให้ Canvas สร้างขนาดกว้าง/ยาว เท่ากับหน้าจออุปกรณ์ที่เปิดอยู่แบบ 100%
+        let cnv = createCanvas(windowWidth, windowHeight);
         cnv.parent('game-container');
         cnv.style('touch-action', 'none'); 
 
         video = createCapture(VIDEO);
-        video.size(width, height);
+        video.size(windowWidth, windowHeight);
         poseNet = ml5.poseNet(video, () => console.log('Model Loaded'));
         poseNet.on('pose', results => poses = results);
         video.hide();
@@ -72,6 +73,12 @@
         env = new p5.Envelope();
         osc.start();
         osc.amp(env);
+    }
+
+    // ฟังก์ชันคำนวณสัดส่วนใหม่ทันทีที่หมุนจอมือถือ หรือย่อหน้าต่างเบราว์เซอร์
+    function windowResized() {
+        resizeCanvas(windowWidth, windowHeight);
+        video.size(windowWidth, windowHeight);
     }
 
     function playSound(type) {
@@ -98,10 +105,6 @@
         timeLeft = 8000;
         lastTime = millis();
         currentQuestion++;
-        
-        // รีเซ็ตเวลาโหลด
-        hoverTime = [0, 0, 0];
-        inputCooldown = millis() + 500; // พักเบรกสั้นๆ 0.5 วิ ก่อนเริ่มจับข้อใหม่
     }
 
     function mousePressed(event) {
@@ -125,7 +128,7 @@
     }
     
     function restartGame() {
-        state = 'PLAY'; score = 0; currentQuestion = 0; fireworks = []; 
+        state = 'PLAY'; score = 0; currentQuestion = 0; fireworks = []; smoothedSensorPos = [0, 0];
         sessionVocab = shuffle([...vocabList]).slice(0, maxQuestions);
         document.getElementById('bgMusic').currentTime = 0;
         document.getElementById('bgMusic').play().catch(e => console.log(e));
@@ -137,18 +140,6 @@
         document.getElementById('bgMusic').pause();
     }
 
-    function getActiveWrist() {
-        if (poses.length > 0) {
-            let pose = poses[0].pose;
-            let lw = pose.leftWrist;
-            let rw = pose.rightWrist;
-            if (lw.confidence > 0.4 || rw.confidence > 0.4) {
-                return (lw.confidence > rw.confidence) ? lw : rw;
-            }
-        }
-        return null;
-    }
-
     function draw() {
         push(); translate(width, 0); scale(-1, 1); image(video, 0, 0, width, height); pop();
         fill(0, 0, 0, 150); rect(0, 0, width, height); 
@@ -158,121 +149,95 @@
         } else if (state === 'PLAY') {
             runGameLogic();
             drawGameUI();
-            drawSensor(); 
         } else if (state === 'END') {
             drawUI('GAME OVER', `Score: ${score}/${maxQuestions}\nTap to Try Again`, 50, width/2, height/2, score >= 5 ? '#10b981' : '#ef4444');
             if (score >= maxQuestions / 2) runFireworks();
         }
     }
 
-    function drawSensor() {
-        if (sensorX !== -1 && sensorY !== -1) {
-            if (millis() < inputCooldown) {
-                fill(150, 150, 150, 150); 
-            } else {
-                fill(249, 115, 22); 
-            }
-            stroke(255); strokeWeight(3);
-            ellipse(sensorX, sensorY, 35, 35); 
-            noStroke();
-        }
-    }
-
     function runGameLogic() {
         let dt = millis() - lastTime;
         lastTime = millis();
-        
-        if (millis() < inputCooldown) return;
-
         timeLeft -= dt;
+
         if (timeLeft <= 0) { playSound('wrong'); nextQuestion(); return; }
 
-        let tx = -1, ty = -1;
-        let wrist = getActiveWrist();
-        
-        if (wrist) {
-            tx = width - wrist.x;
-            ty = wrist.y;
-        } else if (touches.length > 0 || mouseIsPressed) {
-            tx = touches.length > 0 ? touches[0].x : mouseX;
-            ty = touches.length > 0 ? touches[0].y : mouseY;
-        }
+        if (poses.length > 0) {
+            let wristL = poses[0].pose.leftWrist;
+            let wristR = poses[0].pose.rightWrist;
+            
+            let sensorPos = [0, 0];
+            let active = false;
 
-        if (tx !== -1 && ty !== -1) {
-            if (sensorX === -1) { 
-                sensorX = tx; sensorY = ty; 
-            } else { 
-                sensorX = lerp(sensorX, tx, 0.3); 
-                sensorY = lerp(sensorY, ty, 0.3); 
-            }
-
-            for (let i = 0; i < 3; i++) {
-                // ขยาย Hitbox ตรวจจับให้ใหญ่กว่าปุ่มจริง (กว้าง 200 สูง 100)
-                if (abs(sensorX - currentChoices[i].cx) < 100 && abs(sensorY - currentChoices[i].cy) < 50) { 
-                    hoverTime[i] += dt; // เพิ่มเวลาโหลด
-                    if (hoverTime[i] >= HOVER_THRESHOLD) { // ถ้าโหลดเต็ม
-                        if (currentChoices[i].word === targetWord.word) {
-                            score++; playSound('correct');
-                        } else {
-                            playSound('wrong');
-                        }
-                        nextQuestion();
-                        return;
-                    }
+            if (wristL.confidence > 0.4 || wristR.confidence > 0.4) {
+                if (wristL.confidence > wristR.confidence) {
+                    sensorPos = [width - wristL.x, wristL.y]; active = true;
                 } else {
-                    hoverTime[i] = max(0, hoverTime[i] - dt * 2); // ถ้าเอามือออก หลอดจะค่อยๆ ลดลง
+                    sensorPos = [width - wristR.x, wristR.y]; active = true;
                 }
             }
-        } else {
-            sensorX = -1; 
-            for (let i=0; i<3; i++) hoverTime[i] = max(0, hoverTime[i] - dt * 2);
+
+            if (active) {
+                smoothedSensorPos[0] = lerp(smoothedSensorPos[0], sensorPos[0], 0.3);
+                smoothedSensorPos[1] = lerp(smoothedSensorPos[1], sensorPos[1], 0.3);
+
+                if (millis() < selectionCooldown) {
+                    fill(150, 150, 150, 150); 
+                } else {
+                    fill(249, 115, 22); 
+                }
+                ellipse(smoothedSensorPos[0], smoothedSensorPos[1], 35, 35);
+
+                if (millis() > selectionCooldown) {
+                    for (let i = 0; i < 3; i++) {
+                        if (abs(smoothedSensorPos[0] - currentChoices[i].cx) < 100 && abs(smoothedSensorPos[1] - currentChoices[i].cy) < 50) { 
+                            if (currentChoices[i].word === targetWord.word) {
+                                score++; playSound('correct');
+                                selectionCooldown = millis() + 1000; 
+                            } else {
+                                playSound('wrong');
+                            }
+                            nextQuestion();
+                            return;
+                        }
+                    }
+                }
+            }
         }
     }
 
     function drawGameUI() {
-        fill(255); textAlign(LEFT, TOP); textSize(24); textStyle(BOLD); text(`Score: ${score}`, 20, 60); 
-        textAlign(RIGHT, TOP); text(`${currentQuestion} / ${maxQuestions}`, width - 20, 60);
+        // UI ข้อความถูกปรับให้อิงตามขนาดหน้าจอ (ยืดหยุ่นไม่ตกขอบ)
+        fill(255); textAlign(LEFT, TOP); textSize(24); textStyle(BOLD); text(`Score: ${score}`, 20, 80); 
+        textAlign(RIGHT, TOP); text(`${currentQuestion} / ${maxQuestions}`, width - 20, 80);
         
         let seconds = Math.ceil(timeLeft / 1000);
-        textAlign(CENTER, TOP); textSize(30); fill(255); text(`Time: ${seconds}s`, width/2, 60);
+        textAlign(CENTER, TOP); textSize(30); fill(255); text(`Time: ${seconds}s`, width/2, 80);
 
         let img = vocabImages[targetWord.word];
         if (img && img.width > 0) {
             imageMode(CENTER);
-            image(img, width/2, height/2 - 50, 180, 180); 
+            image(img, width/2, height/2 - 40, 180, 180); 
             imageMode(CORNER);
         } else {
             textAlign(CENTER, CENTER); textSize(40); fill(255, 255, 255, 150);
-            text("[ รูป " + targetWord.word + ".png ]", width/2, height/2 - 50);
+            text("[ รูป " + targetWord.word + ".png ]", width/2, height/2 - 40);
         }
 
-        let boxW = 160, boxH = 60, gap = 20;
+        // ปรับขนาดกล่องตัวเลือกให้ยืดหยุ่นตามหน้าจอมือถือ/คอม
+        let boxW = min(160, (width - 60) / 3); 
+        let boxH = min(60, height * 0.1);
+        let gap = min(20, width * 0.05);
         let startX = (width - (3 * boxW + 2 * gap)) / 2;
 
         for (let i = 0; i < 3; i++) {
             let cx = startX + i * (boxW + gap) + boxW / 2;
-            let cy = height - 80;
+            let cy = height - boxH - 40; // ขยับกล่องลอยขึ้นจากขอบจอด้านล่างเสมอ
             currentChoices[i].cx = cx; currentChoices[i].cy = cy;
 
-            // คํานวณเปอร์เซ็นต์หลอดโหลด (0 ถึง 1)
-            let progress = constrain(hoverTime[i] / HOVER_THRESHOLD, 0, 1);
-
-            rectMode(CENTER); 
-            // 1. วาดพื้นหลังกล่อง
-            fill(255, 255, 255, 200); stroke(0); strokeWeight(2);
+            rectMode(CENTER); fill(255, 255, 255, 200); stroke(0); strokeWeight(2);
             rect(cx, cy, boxW, boxH, 15);
-            
-            // 2. วาดหลอดพลังสีเขียวทับซ้อน (ตามระยะเวลาที่แช่มือ)
-            if (progress > 0) {
-                rectMode(CORNER);
-                fill(16, 185, 129, 180); // สีเขียวโปร่งแสง
-                noStroke();
-                rect(cx - boxW/2, cy - boxH/2, boxW * progress, boxH, 15);
-                rectMode(CENTER);
-            }
-
-            // 3. วาดข้อความคำศัพท์
-            fill(0); noStroke(); textSize(24); textAlign(CENTER, CENTER);
+            fill(0); noStroke(); textSize(min(24, boxW * 0.2)); textAlign(CENTER, CENTER);
             text(currentChoices[i].word.toUpperCase(), cx, cy);
             rectMode(CORNER);
         }
