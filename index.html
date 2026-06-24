@@ -29,16 +29,29 @@
     let score = 0, currentQuestion = 0, maxQuestions = 10;
     let targetWord = null, timeLeft = 8000, lastTime = 0;
     let currentChoices = [];
+    let sessionVocab = []; // คลังคำศัพท์เฉพาะรอบนั้นๆ
     
-    // เปลี่ยนมาใช้ Emoji เป็นรูปภาพแทน
+    // คลังคำศัพท์เต็มจากบทเพลง 19 คำหลัก
     const vocabList = [
-        { word: 'nose', emoji: '👃' },
+        { word: 'body', emoji: '🧍' },
+        { word: 'head', emoji: '🧑' },
+        { word: 'hair', emoji: '💇' },
+        { word: 'face', emoji: '👦' },
         { word: 'eye', emoji: '👁️' },
         { word: 'ear', emoji: '👂' },
+        { word: 'nose', emoji: '👃' },
+        { word: 'mouth', emoji: '👄' },
+        { word: 'moustache', emoji: '🥸' },
+        { word: 'cheek', emoji: '😊' },
+        { word: 'chin', emoji: '🧑' },
+        { word: 'neck', emoji: '🧣' },
+        { word: 'shoulders', emoji: '🤷' },
         { word: 'arm', emoji: '💪' },
         { word: 'hand', emoji: '🖐️' },
-        { word: 'leg', emoji: '🦵' },
-        { word: 'foot', emoji: '🦶' }
+        { word: 'hips', emoji: '💃' },
+        { word: 'leg', emoji: '%;"> Leg' },
+        { word: 'knees', emoji: '🦵' },
+        { word: 'feet', emoji: '🦶' }
     ];
 
     let osc, env, fireworks = [];
@@ -70,16 +83,17 @@
         }
     }
 
-    // สุ่มคำศัพท์ 3 ตัวเลือก
     function nextQuestion() {
         if (currentQuestion >= maxQuestions) {
             state = 'END';
             if (score >= maxQuestions / 2) playSound('win');
             return;
         }
-        targetWord = random(vocabList);
         
-        // หาตัวหลอก 2 ตัวที่ไม่ซ้ำกับคำตอบ
+        // ดึงคำศัพท์จากรอบเซสชันปัจจุบัน (มั่นใจได้ว่าไม่ซ้ำกันใน 10 ข้อ)
+        targetWord = sessionVocab[currentQuestion];
+        
+        // สุ่มตัวหลอก 2 ตัวที่ไม่ซ้ำกับคำตอบปัจจุบัน
         let distractors = shuffle(vocabList.filter(v => v.word !== targetWord.word)).slice(0, 2);
         currentChoices = shuffle([targetWord, distractors[0], distractors[1]]);
 
@@ -93,14 +107,16 @@
         userStartAudio(); 
         
         if (state === 'START') { 
-            state = 'PLAY'; nextQuestion(); 
+            state = 'PLAY'; 
+            // เริ่มต้นสุ่มชุดคำศัพท์ 10 คำจาก 19 คำสำหรับรอบนี้
+            sessionVocab = shuffle([...vocabList]).slice(0, maxQuestions);
+            nextQuestion(); 
             document.getElementById('bgMusic').play().catch(e => console.log(e));
         } else if (state === 'END') { 
             restartGame();
         }
     }
 
-    // --- ฟังก์ชันปุ่มต่างๆ ---
     function toggleMute() {
         let music = document.getElementById('bgMusic');
         let btn = document.getElementById('muteBtn');
@@ -110,8 +126,10 @@
     
     function restartGame() {
         state = 'PLAY'; score = 0; currentQuestion = 0; fireworks = []; 
+        // สุ่มชุดคำศัพท์ใหม่แกะกล่อง 10 คำ
+        sessionVocab = shuffle([...vocabList]).slice(0, maxQuestions);
         document.getElementById('bgMusic').currentTime = 0;
-        document.getElementById('bgMusic').play();
+        document.getElementById('bgMusic').play().catch(e => console.log(e));
         nextQuestion();
     }
     
@@ -119,11 +137,10 @@
         state = 'END'; currentQuestion = maxQuestions; fireworks = [];
         document.getElementById('bgMusic').pause();
     }
-    // ----------------------
 
     function draw() {
         push(); translate(width, 0); scale(-1, 1); image(video, 0, 0, width, height); pop();
-        fill(0, 0, 0, 150); rect(0, 0, width, height); // ทำให้จอมืดลงให้ปุ่มเด่นขึ้น
+        fill(0, 0, 0, 150); rect(0, 0, width, height); 
 
         if (state === 'START') {
             drawUI('Touch to Start', 'แตะหน้าจอเพื่อเริ่มเกม!', 40, width/2, height/2);
@@ -148,10 +165,9 @@
             let tx = touches.length > 0 ? touches[0].x : mouseX;
             let ty = touches.length > 0 ? touches[0].y : mouseY;
 
-            // เช็คว่าไม้กายสิทธิ์แตะโดนกล่องข้อความไหน
             for (let i = 0; i < 3; i++) {
                 let d = dist(tx, ty, currentChoices[i].cx, currentChoices[i].cy);
-                if (d < 50) { // ถ้าระยะแตะใกล้กล่อง
+                if (d < 50) { 
                     if (currentChoices[i].word === targetWord.word) {
                         score++; playSound('correct');
                     } else {
@@ -171,11 +187,9 @@
         let seconds = Math.ceil(timeLeft / 1000);
         textAlign(CENTER, TOP); textSize(30); fill(255); text(`Time: ${seconds}s`, width/2, 60);
 
-        // วาดรูป Emoji ใหญ่ๆ ตรงกลางจอ
         textAlign(CENTER, CENTER); textSize(120);
         text(targetWord.emoji, width/2, height/2 - 40);
 
-        // วาดกล่องตัวเลือก 3 กล่องด้านล่าง
         let boxW = 160, boxH = 60, gap = 20;
         let startX = (width - (3 * boxW + 2 * gap)) / 2;
 
@@ -183,13 +197,12 @@
             let cx = startX + i * (boxW + gap) + boxW / 2;
             let cy = height - 80;
             
-            // บันทึกพิกัดกล่องไว้ตรวจจับการคลิก
             currentChoices[i].cx = cx; currentChoices[i].cy = cy;
 
             rectMode(CENTER); fill(255, 255, 255, 200); stroke(0); strokeWeight(2);
             rect(cx, cy, boxW, boxH, 15);
 
-            fill(0); noStroke(); textSize(26); textAlign(CENTER, CENTER);
+            fill(0); noStroke(); textSize(24); textAlign(CENTER, CENTER);
             text(currentChoices[i].word.toUpperCase(), cx, cy);
             rectMode(CORNER);
         }
@@ -209,7 +222,6 @@
         fill(c); textSize(size); text(t1, x, y - 30); fill(255); textSize(20); text(t2, x, y + 40);
     }
 
-    // สุ่มสลับตำแหน่งอาร์เรย์ (Fisher-Yates Shuffle)
     function shuffle(array) {
         let currentIndex = array.length, randomIndex;
         while (currentIndex !== 0) {
