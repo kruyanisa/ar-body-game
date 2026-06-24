@@ -62,21 +62,24 @@
                     noStroke();
                     ellipse(x, y, 15, 15);
                     
+                    // แปลงข้อความจาก camelCase เป็นพิมพ์เล็กเว้นวรรค (เช่น leftEye -> left eye)
+                    let partName = keypoint.part.replace(/([A-Z])/g, ' $1').toLowerCase();
+                    
                     // ตั้งค่าฟอนต์
                     fill(255);
                     stroke(0);
                     strokeWeight(3);
                     textSize(20);
                     
-                    // เช็คตำแหน่งเพื่อสลับฝั่งตัวหนังสือ
+                    // ผลักตัวหนังสือออกด้านนอกหน้า เพื่อไม่ให้ซ้อนทับกันตรงกลาง
                     if (x < width / 2) {
-                        // ถ้าจุดอยู่ซ้ายจอ -> ตัวหนังสืออยู่ขวามือของปุ่ม
-                        textAlign(LEFT, CENTER);
-                        text(keypoint.part, x + 15, y);
-                    } else {
-                        // ถ้าจุดอยู่ขวาจอ -> ตัวหนังสืออยู่ซ้ายมือของปุ่ม
+                        // จุดอยู่ครึ่งซ้ายของจอ -> ให้ตัวหนังสืออยู่ซ้ายมือของจุด
                         textAlign(RIGHT, CENTER);
-                        text(keypoint.part, x - 15, y);
+                        text(partName, x - 15, y);
+                    } else {
+                        // จุดอยู่ครึ่งขวาของจอ -> ให้ตัวหนังสืออยู่ขวามือของจุด
+                        textAlign(LEFT, CENTER);
+                        text(partName, x + 15, y);
                     }
                 }
             }
