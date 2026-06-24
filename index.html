@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
+    <script src="https://unpkg.com/ml5@0.12.2/dist/ml5.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600&display=swap" rel="stylesheet">
+    <style>
+        body { margin: 0; display: flex; justify-content: center; align-items: center; background-color: transparent; overflow: hidden; }
+        canvas { border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); transform: scaleX(-1); /* สลับซ้ายขวาให้เหมือนกระจก */ }
+    </style>
+</head>
+<body>
+<script>
+    let video;
+    let poseNet;
+    let poses = [];
+
+    function setup() {
+        createCanvas(640, 480);
+        video = createCapture(VIDEO);
+        video.size(width, height);
+        
+        // เรียกใช้ AI จับการเคลื่อนไหว
+        poseNet = ml5.poseNet(video, modelReady);
+        poseNet.on('pose', function(results) {
+            poses = results;
+        });
+        
+        video.hide();
+        textFont('Poppins');
+    }
+
+    function modelReady() {
+        console.log('Model Loaded');
+    }
+
+    function draw() {
+        // วาดภาพจากกล้อง
+        push();
+        translate(width, 0);
+        scale(-1, 1);
+        image(video, 0, 0, width, height);
+        pop();
+
+        // วาดจุดและคำศัพท์บนร่างกาย
+        drawKeypoints();
+    }
+
+    function drawKeypoints()  {
+        for (let i = 0; i < poses.length; i++) {
+            let pose = poses[i].pose;
+            for (let j = 0; j < pose.keypoints.length; j++) {
+                let keypoint = pose.keypoints[j];
+                
+                // ถ้าระบบมั่นใจว่าเจอจุดนี้เกิน 20%
+                if (keypoint.score > 0.2) {
+                    let x = width - keypoint.position.x; // ปรับแกน X เพราะเรากลับด้านกระจก
+                    let y = keypoint.position.y;
+
+                    // วาดจุดสีส้ม
+                    fill(249, 115, 22);
+                    noStroke();
+                    ellipse(x, y, 15, 15);
+                    
+                    // แปะคำศัพท์
+                    fill(255);
+                    stroke(0);
+                    strokeWeight(3);
+                    textSize(20);
+                    text(keypoint.part, x + 15, y + 5);
+                }
+            }
+        }
+    }
+</script>
+</body>
+</html>
