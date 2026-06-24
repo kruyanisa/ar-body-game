@@ -38,7 +38,7 @@
     let vocabImages = {}; 
     
     let smoothedSensorPos = [0, 0];
-    let selectionCooldown = 0; 
+    let isWaitingForRelease = false; // ตัวแปรล็อกระบบสำหรับป้องกันการเอามือลงแล้วลั่นซ้ำ
 
     const vocabList = [
         { word: 'body' }, { word: 'head' }, { word: 'hair' }, { word: 'face' },
@@ -80,9 +80,9 @@
 
     function playSound(type) {
         if (type === 'correct') {
-            osc.setType('sine'); osc.freq(880); env.play(osc, 0, 0.1, 0.1, 0.1, 0); // เสียงแหลมปิ๊ง (ถูก)
+            osc.setType('sine'); osc.freq(880); env.play(osc, 0, 0.1, 0.1, 0.1, 0);
         } else if (type === 'wrong') {
-            osc.setType('sawtooth'); osc.freq(150); env.play(osc, 0, 0.1, 0.3, 0.1, 0); // เสียงทุ้มแป๊ด (ผิด)
+            osc.setType('sawtooth'); osc.freq(150); env.play(osc, 0, 0.1, 0.3, 0.1, 0);
         } else if (type === 'win') {
             osc.setType('triangle');
             setTimeout(() => { osc.freq(523.25); env.play(osc, 0, 0.1, 0.1, 0.1, 0); }, 0);
@@ -102,6 +102,9 @@
         timeLeft = 8000;
         lastTime = millis();
         currentQuestion++;
+        
+        // เมื่อขึ้นข้อใหม่ สั่งล็อกระบบทันทีจนกว่าผู้เล่นจะเอามือออกจากโซนปุ่มเดิม
+        isWaitingForRelease = true; 
     }
 
     function mousePressed(event) {
@@ -175,30 +178,39 @@
             }
 
             if (active) {
-                // อัปเดตพิกัดมือที่ซ่อนอยู่
                 smoothedSensorPos[0] = lerp(smoothedSensorPos[0], sensorPos[0], 0.3);
                 smoothedSensorPos[1] = lerp(smoothedSensorPos[1], sensorPos[1], 0.3);
                 
-                // เอาโค้ดวาดจุดสีส้มออกไปแล้ว! ปล่อยให้มือเป็นตัวควบคุมแบบไร้รอยต่อ
-
-                if (millis() > selectionCooldown) {
-                    for (let i = 0; i < 3; i++) {
-                        // ดึงขนาดพื้นที่รับสัมผัส (Hitbox) ที่คำนวณไว้ตอนวาดปุ่ม
-                        let hitAreaX = currentChoices[i].hitW || 120;
-                        let hitAreaY = currentChoices[i].hitH || 60;
-                        
-                        // ตรวจสอบว่ามือเข้าใกล้ปุ่มในระยะ Hitbox หรือไม่
-                        if (abs(smoothedSensorPos[0] - currentChoices[i].cx) < hitAreaX && abs(smoothedSensorPos[1] - currentChoices[i].cy) < hitAreaY) { 
-                            if (currentChoices[i].word === targetWord.word) {
-                                score++; playSound('correct');
-                                selectionCooldown = millis() + 1000; 
-                            } else {
-                                playSound('wrong');
-                            }
-                            nextQuestion();
-                            return;
-                        }
+                // ตรวจสอบว่าปัจจุบันพิกัดมืออยู่ในเขตปุ่มใดๆ หรือไม่
+                let handOverAnyButton = false;
+                let hoveredIndex = -1;
+                
+                for (let i = 0; i < 3; i++) {
+                    let hitAreaX = currentChoices[i].hitW || 120;
+                    let hitAreaY = currentChoices[i].hitH || 60;
+                    if (abs(smoothedSensorPos[0] - currentChoices[i].cx) < hitAreaX && abs(smoothedSensorPos[1] - currentChoices[i].cy) < hitAreaY) { 
+                        handOverAnyButton = true;
+                        hoveredIndex = i;
                     }
+                }
+
+                // ป้องกันบักตอนเอามือลง: หากยังล็อกอยู่และมือยังไม่เคลียร์ออกจากปุ่มเดิม ระบบจะหยุดทำงาน
+                if (isWaitingForRelease) {
+                    if (!handOverAnyButton) {
+                        isWaitingForRelease = false; // ปลดล็อกระบบเมื่อเอามือลงพ้นปุ่มทั้งหมดเรียบร้อยแล้ว
+                    }
+                    return; // ข้ามการเช็คคำตอบในเฟรมนี้ไปก่อน
+                }
+
+                // ทำงานตรวจจับคำตอบปกติเมื่อผู้เล่นชักมือลงไปแล้วยกขึ้นมาใหม่เรียบร้อย
+                if (!isWaitingForRelease && handOverAnyButton && hoveredIndex !== -1) {
+                    if (currentChoices[hoveredIndex].word === targetWord.word) {
+                        score++; playSound('correct');
+                    } else {
+                        playSound('wrong');
+                    }
+                    nextQuestion();
+                    return;
                 }
             }
         }
@@ -221,15 +233,13 @@
             text("[ รูป " + targetWord.word + ".png ]", width/2, height/2 - 40);
         }
 
-        // --- ระบบคำนวณถ่างปุ่มให้ชิดขอบซ้าย/ขวา ---
-        let screenPadding = width * 0.05; // เว้นระยะขอบจอ 5%
-        let boxW = min(200, width * 0.26); // ปุ่มกว้างสุด 200px
+        let screenPadding = width * 0.05; 
+        let boxW = min(200, width * 0.26); 
         let boxH = min(70, height * 0.12);
         
-        // คำนวณหาช่องว่าง (Gap) โดยเอาพื้นที่ที่เหลือมาหารแบ่งให้เท่าๆ กัน
         let availableWidth = width - (screenPadding * 2);
         let gap = (availableWidth - (boxW * 3)) / 2; 
-        let startX = screenPadding; // เริ่มวาดปุ่มแรกจากขอบจอ
+        let startX = screenPadding; 
 
         for (let i = 0; i < 3; i++) {
             let cx = startX + i * (boxW + gap) + boxW / 2;
@@ -237,13 +247,21 @@
             
             currentChoices[i].cx = cx; 
             currentChoices[i].cy = cy;
-            // บันทึกระยะพื้นที่รับสัมผัส (ให้กว้างกว่าปุ่มจริง 50px)
-            currentChoices[i].hitW = boxW / 2 + 50; 
-            currentChoices[i].hitH = boxH / 2 + 50;
+            currentChoices[i].hitW = boxW / 2 + 15; 
+            currentChoices[i].hitH = boxH / 2 + 15;
 
-            rectMode(CENTER); fill(255, 255, 255, 200); stroke(0); strokeWeight(2);
+            rectMode(CENTER); 
+            
+            // หากปุ่มใดอยู่ในสภาวะติดล็อกจากการที่เด็กยังไม่ชักมือลง จะเปลี่ยนเป็นสีเทาเพื่อแสดงผลให้รู้ตัว
+            if (isWaitingForRelease && abs(smoothedSensorPos[0] - cx) < currentChoices[i].hitW && abs(smoothedSensorPos[1] - cy) < currentChoices[i].hitH) {
+                fill(180, 180, 180, 200); 
+            } else {
+                fill(255, 255, 255, 200);
+            }
+            
+            stroke(0); strokeWeight(2);
             rect(cx, cy, boxW, boxH, 15);
-            fill(0); noStroke(); textSize(min(24, boxW * 0.2)); textAlign(CENTER, CENTER);
+            fill(0); noStroke(); textSize(min(24, boxW * 0.18)); textAlign(CENTER, CENTER);
             text(currentChoices[i].word.toUpperCase(), cx, cy);
             rectMode(CORNER);
         }
