@@ -12,6 +12,7 @@
     </style>
 </head>
 <body>
+    <audio id="bgMusic" loop src="song1.mp3"></audio>
 <script>
     let video, poseNet, poses = [];
     let state = 'START'; // START, PLAY, END
@@ -73,10 +74,21 @@
         currentQuestion++;
     }
 
-    function mousePressed() {
-        if (state === 'START') { state = 'PLAY'; nextQuestion(); }
-        else if (state === 'END') { state = 'START'; score = 0; currentQuestion = 0; fireworks = []; }
-        userStartAudio(); // บังคับอนุญาตเล่นเสียงบน Browser
+function mousePressed() {
+        if (state === 'START') { 
+            state = 'PLAY'; 
+            nextQuestion(); 
+            document.getElementById('bgMusic').play(); // เล่นเพลงตอนเริ่มเกม
+        }
+        else if (state === 'END') { 
+            state = 'START'; 
+            score = 0; 
+            currentQuestion = 0; 
+            fireworks = []; 
+            document.getElementById('bgMusic').pause(); // หยุดเพลงตอนจบเกม
+            document.getElementById('bgMusic').currentTime = 0; // รีเซ็ตเพลงกลับไปจุดเริ่มต้น
+        }
+        userStartAudio(); 
     }
 
     function draw() {
