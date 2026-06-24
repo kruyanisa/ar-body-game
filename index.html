@@ -7,20 +7,22 @@
     <script src="https://unpkg.com/ml5@0.12.2/dist/ml5.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;800&family=Sarabun:wght@700&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; display: flex; justify-content: center; align-items: center; background-color: #1e293b; overflow: hidden; font-family: 'Poppins', sans-serif; }
+        body { margin: 0; display: flex; justify-content: center; align-items: center; background-color: #1e293b; overflow: hidden; font-family: 'Poppins', sans-serif; cursor: pointer; }
         canvas { border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        #muteBtn { position: absolute; top: 20px; left: 20px; z-index: 10; padding: 10px 20px; font-size: 16px; font-weight: bold; border-radius: 10px; background: #ef4444; color: white; border: none; cursor: pointer; font-family: 'Poppins', sans-serif; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: 0.2s; }
+        #muteBtn:hover { transform: scale(1.05); }
     </style>
 </head>
 <body>
-    <audio id="bgMusic" loop src="Poosaokalor.mp3"></audio>
-    <button id="muteBtn" style="position: absolute; top: 20px; left: 20px; z-index: 10; padding: 10px 20px; font-size: 16px; font-weight: bold; border-radius: 10px; background: #ef4444; color: white; border: none; cursor: pointer; font-family: 'Poppins', sans-serif;">🔊 Mute</button>
+    <audio id="bgMusic" loop src="song1.mp3"></audio>
+    <button id="muteBtn">🔊 Mute</button>
+
 <script>
     let video, poseNet, poses = [];
-    let state = 'START'; // START, PLAY, END
+    let state = 'START'; 
     let score = 0, currentQuestion = 0, maxQuestions = 10;
     let targetWord = null, timeLeft = 8000, lastTime = 0;
     
-    // คำศัพท์ที่แมตช์กับจุดของ PoseNet
     const vocabList = [
         { word: 'nose', parts: ['nose'] },
         { word: 'eye', parts: ['leftEye', 'rightEye'] },
@@ -31,8 +33,7 @@
         { word: 'foot', parts: ['leftAnkle', 'rightAnkle'] }
     ];
 
-    let osc, env;
-    let fireworks = [];
+    let osc, env, fireworks = [];
 
     function setup() {
         createCanvas(640, 480);
@@ -42,7 +43,6 @@
         poseNet.on('pose', results => poses = results);
         video.hide();
         
-        // Setup Audio Synthesizer
         osc = new p5.Oscillator();
         env = new p5.Envelope();
         osc.start();
@@ -75,33 +75,46 @@
         currentQuestion++;
     }
 
-function mousePressed() {
+    function mousePressed() {
+        // ป้องกันการกดโดนปุ่ม Mute แล้วเผลอเริ่มเกม
+        if (mouseX < 120 && mouseY < 60) return; 
+
         if (state === 'START') { 
-            state = 'PLAY'; 
-            nextQuestion(); 
-            document.getElementById('bgMusic').play(); // เล่นเพลงตอนเริ่มเกม
-        }
-        else if (state === 'END') { 
-            state = 'START'; 
-            score = 0; 
-            currentQuestion = 0; 
-            fireworks = []; 
-            document.getElementById('bgMusic').pause(); // หยุดเพลงตอนจบเกม
-            document.getElementById('bgMusic').currentTime = 0; // รีเซ็ตเพลงกลับไปจุดเริ่มต้น
+            state = 'PLAY'; nextQuestion(); 
+            document.getElementById('bgMusic').play();
+        } else if (state === 'END') { 
+            state = 'START'; score = 0; currentQuestion = 0; fireworks = []; 
+            document.getElementById('bgMusic').pause();
+            document.getElementById('bgMusic').currentTime = 0;
         }
         userStartAudio(); 
     }
 
+    // ระบบปุ่ม Mute แยกออกมาจัดการ
+    document.getElementById('muteBtn').addEventListener('click', function() {
+        let music = document.getElementById('bgMusic');
+        if (music.paused) {
+            music.play();
+            this.innerText = "🔊 Mute";
+            this.style.background = "#ef4444";
+        } else {
+            music.pause();
+            this.innerText = "🔇 Play";
+            this.style.background = "#10b981";
+        }
+    });
+
     function draw() {
         push(); translate(width, 0); scale(-1, 1); image(video, 0, 0, width, height); pop();
-        fill(0, 0, 0, 100); rect(0, 0, width, height); // Darken video
+        fill(0, 0, 0, 100); rect(0, 0, width, height); 
 
         if (state === 'START') {
-            drawUI('Touch to Start', 'เอาข้อมือแตะที่จุดเพื่อเก็บคะแนน!', 40, width/2, height/2);
+            drawUI('Touch to Start', 'คลิกเพื่อเริ่มเกม!', 40, width/2, height/2);
         } else if (state === 'PLAY') {
             runGameLogic();
             drawKeypoints();
             drawGameUI();
+            drawMagicWand(); // วาดไม้กายสิทธิ์
         } else if (state === 'END') {
             if (score === maxQuestions) {
                 drawUI('PERFECT!', `Score: ${score}/${maxQuestions}`, 60, width/2, height/2 - 20, '#10b981');
@@ -120,23 +133,24 @@ function mousePressed() {
         if (timeLeft <= 0) {
             playSound('wrong');
             nextQuestion();
+            return;
         }
 
-        // ตรวจสอบการชนกันระหว่างข้อมือ (Wrist) กับคำเป้าหมาย
-        if (poses.length > 0) {
+        // เช็คการใช้นิ้ว/เมาส์ จิ้มที่จุดสีเขียว
+        if (poses.length > 0 && mouseIsPressed) {
             let pose = poses[0].pose;
-            let wrists = [pose.leftWrist, pose.rightWrist].filter(w => w.score > 0.2);
             let targets = pose.keypoints.filter(k => targetWord.parts.includes(k.part) && k.score > 0.2);
 
-            for (let w of wrists) {
-                for (let t of targets) {
-                    let d = dist(w.x, w.y, t.position.x, t.position.y);
-                    if (d < 60) { // ระยะการสัมผัส 60px
-                        score++;
-                        playSound('correct');
-                        nextQuestion();
-                        return;
-                    }
+            for (let t of targets) {
+                let targetX = width - t.position.x;
+                let targetY = t.position.y;
+                let d = dist(mouseX, mouseY, targetX, targetY);
+                
+                if (d < 50) { // ถ้าระยะห่างของเมาส์กับจุดเขียวใกล้กัน = ได้แต้ม
+                    score++;
+                    playSound('correct');
+                    nextQuestion();
+                    return;
                 }
             }
         }
@@ -144,7 +158,7 @@ function mousePressed() {
 
     function drawGameUI() {
         fill(255); textAlign(LEFT, TOP); textSize(24); textStyle(BOLD);
-        text(`Score: ${score}`, 20, 20);
+        text(`Score: ${score}`, width/2 - 280, 20); // ขยับหลบปุ่ม Mute
         textAlign(RIGHT, TOP);
         text(`${currentQuestion} / ${maxQuestions}`, width - 20, 20);
         
@@ -170,21 +184,31 @@ function mousePressed() {
                     let x = width - keypoint.position.x;
                     let y = keypoint.position.y;
                     
-                    // ไฮไลต์สีเขียวถ้าเป็นเป้าหมาย สีส้มถ้าเป็นมือ สีขาวถ้าเป็นจุดอื่น
-                    if (targetWord.parts.includes(keypoint.part)) { fill(16, 185, 129); ellipse(x, y, 30, 30); } 
-                    else if (keypoint.part.includes('Wrist')) { fill(249, 115, 22); ellipse(x, y, 25, 25); } 
-                    else { fill(255, 100); ellipse(x, y, 10, 10); }
+                    if (targetWord.parts.includes(keypoint.part)) { 
+                        fill(16, 185, 129); ellipse(x, y, 40, 40); 
+                    } else { 
+                        fill(255, 100); ellipse(x, y, 10, 10); 
+                    }
                 }
             }
         }
     }
 
-    // ระบบพลุฉลอง
+    function drawMagicWand() {
+        // วาดไม้กายสิทธิ์และจุดสีส้มตามตำแหน่งเมาส์/นิ้ว
+        fill(249, 115, 22);
+        ellipse(mouseX, mouseY, 25, 25);
+        textAlign(CENTER, CENTER);
+        textSize(40);
+        text('🪄', mouseX + 25, mouseY - 25);
+    }
+
     class Particle {
         constructor(x, y, c) { this.x = x; this.y = y; this.vx = random(-5, 5); this.vy = random(-5, 5); this.alpha = 255; this.c = c; }
         update() { this.x += this.vx; this.y += this.vy; this.alpha -= 5; }
         show() { noStroke(); fill(this.c[0], this.c[1], this.c[2], this.alpha); ellipse(this.x, this.y, 8); }
     }
+    
     function runFireworks() {
         if (random(1) < 0.1) {
             let c = [random(255), random(255), random(255)];
@@ -196,18 +220,6 @@ function mousePressed() {
             if (fireworks[i].alpha <= 0) fireworks.splice(i, 1);
         }
     }
-    document.getElementById('muteBtn').addEventListener('click', function() {
-        let music = document.getElementById('bgMusic');
-        if (music.paused) {
-            music.play();
-            this.innerText = "🔊 Mute";
-            this.style.background = "#ef4444";
-        } else {
-            music.pause();
-            this.innerText = "🔇 Play";
-            this.style.background = "#10b981";
-        }
-    });
 </script>
 </body>
 </html>
