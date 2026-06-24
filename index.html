@@ -9,19 +9,26 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;800&family=Sarabun:wght@700&display=swap" rel="stylesheet">
     <style>
         body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #1e293b; overflow: hidden; font-family: 'Poppins', 'Sarabun', sans-serif; touch-action: none; }
-        canvas { width: 100%; max-width: 640px; height: auto; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); touch-action: none; }
+        
+        /* สร้างกล่องบรรจุเกมให้อยู่ตรงกลาง และรวมปุ่มไว้ข้างใน */
+        #game-container { position: relative; width: 95%; max-width: 800px; aspect-ratio: 4/3; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        canvas { width: 100% !important; height: 100% !important; border-radius: 15px; display: block; touch-action: none; }
+        
         .btn { position: absolute; z-index: 10; padding: 8px 12px; font-size: 14px; font-weight: bold; border-radius: 8px; color: white; border: none; cursor: pointer; font-family: 'Sarabun', sans-serif; transition: 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         .btn:hover { transform: scale(1.05); }
-        #muteBtn { top: 10px; left: 10px; background: #ef4444; }
-        #restartBtn { top: 10px; right: 90px; background: #3b82f6; }
-        #endBtn { top: 10px; right: 10px; background: #64748b; }
+        #muteBtn { top: 15px; left: 15px; background: #ef4444; }
+        #restartBtn { top: 15px; right: 100px; background: #3b82f6; }
+        #endBtn { top: 15px; right: 15px; background: #64748b; }
     </style>
 </head>
 <body>
-    <audio id="bgMusic" loop src="Poosaokalor.mp3"></audio>
-    <button id="muteBtn" class="btn" onclick="toggleMute()">🔊 Mute</button>
-    <button id="restartBtn" class="btn" onclick="restartGame()">🔄 เริ่มใหม่</button>
-    <button id="endBtn" class="btn" onclick="forceEndGame()">🛑 จบเกม</button>
+    
+    <div id="game-container">
+        <audio id="bgMusic" loop src="Poosaokalor.mp3"></audio>
+        <button id="muteBtn" class="btn" onclick="toggleMute()">🔊 Mute</button>
+        <button id="restartBtn" class="btn" onclick="restartGame()">🔄 เริ่มใหม่</button>
+        <button id="endBtn" class="btn" onclick="forceEndGame()">🛑 จบเกม</button>
+    </div>
 
 <script>
     let video, poseNet, poses = [];
@@ -30,7 +37,7 @@
     let targetWord = null, timeLeft = 8000, lastTime = 0;
     let currentChoices = [];
     let sessionVocab = []; 
-    let vocabImages = {}; // ตัวแปรเก็บรูปภาพ
+    let vocabImages = {}; 
     
     const vocabList = [
         { word: 'body' }, { word: 'head' }, { word: 'hair' }, { word: 'face' },
@@ -42,19 +49,18 @@
 
     let osc, env, fireworks = [];
 
-    // โหลดรูปภาพเตรียมไว้ก่อนเริ่มเกม
     function preload() {
         vocabList.forEach(v => {
-            vocabImages[v.word] = loadImage(v.word + '.png', 
-                img => console.log('Loaded: ' + v.word), 
-                err => console.log('Image not found: ' + v.word)
-            );
+            vocabImages[v.word] = loadImage(v.word + '.png');
         });
     }
 
     function setup() {
+        // ย้าย Canvas เข้าไปอยู่ในกล่อง #game-container
         let cnv = createCanvas(640, 480);
+        cnv.parent('game-container');
         cnv.style('touch-action', 'none'); 
+
         video = createCapture(VIDEO);
         video.size(width, height);
         poseNet = ml5.poseNet(video, () => console.log('Model Loaded'));
@@ -85,11 +91,9 @@
             if (score >= maxQuestions / 2) playSound('win');
             return;
         }
-        
         targetWord = sessionVocab[currentQuestion];
         let distractors = shuffle(vocabList.filter(v => v.word !== targetWord.word)).slice(0, 2);
         currentChoices = shuffle([targetWord, distractors[0], distractors[1]]);
-
         timeLeft = 8000;
         lastTime = millis();
         currentQuestion++;
@@ -98,7 +102,6 @@
     function mousePressed(event) {
         if (event && event.target && event.target.tagName === 'BUTTON') return; 
         userStartAudio(); 
-        
         if (state === 'START') { 
             state = 'PLAY'; 
             sessionVocab = shuffle([...vocabList]).slice(0, maxQuestions);
@@ -129,6 +132,19 @@
         document.getElementById('bgMusic').pause();
     }
 
+    // ฟังก์ชันช่วยหาข้อมือที่ชัดที่สุด
+    function getActiveWrist() {
+        if (poses.length > 0) {
+            let pose = poses[0].pose;
+            let lw = pose.leftWrist;
+            let rw = pose.rightWrist;
+            if (lw.confidence > 0.2 || rw.confidence > 0.2) {
+                return (lw.confidence > rw.confidence) ? lw : rw;
+            }
+        }
+        return null;
+    }
+
     function draw() {
         push(); translate(width, 0); scale(-1, 1); image(video, 0, 0, width, height); pop();
         fill(0, 0, 0, 150); rect(0, 0, width, height); 
@@ -138,10 +154,29 @@
         } else if (state === 'PLAY') {
             runGameLogic();
             drawGameUI();
-            drawMagicWand(); 
+            drawSensor(); // วาดเซ็นเซอร์ข้อมือ
         } else if (state === 'END') {
             drawUI('GAME OVER', `Score: ${score}/${maxQuestions}\nTap to Try Again`, 50, width/2, height/2, score >= 5 ? '#10b981' : '#ef4444');
             if (score >= maxQuestions / 2) runFireworks();
+        }
+    }
+
+    function drawSensor() {
+        let tx = -1, ty = -1;
+        let wrist = getActiveWrist();
+        
+        if (wrist) {
+            tx = width - wrist.x; // พิกัดข้อมือ
+            ty = wrist.y;
+        } else if (touches.length > 0 || mouseIsPressed) {
+            tx = touches.length > 0 ? touches[0].x : mouseX; // พิกัดนิ้ว/เมาส์สำรอง
+            ty = touches.length > 0 ? touches[0].y : mouseY;
+        }
+
+        if (tx !== -1 && ty !== -1) {
+            fill(249, 115, 22); stroke(255); strokeWeight(3);
+            ellipse(tx, ty, 35, 35); // วาดจุดเซ็นเซอร์สีส้ม
+            noStroke();
         }
     }
 
@@ -152,13 +187,21 @@
 
         if (timeLeft <= 0) { playSound('wrong'); nextQuestion(); return; }
 
-        if (touches.length > 0 || mouseIsPressed) {
-            let tx = touches.length > 0 ? touches[0].x : mouseX;
-            let ty = touches.length > 0 ? touches[0].y : mouseY;
+        let tx = -1, ty = -1;
+        let wrist = getActiveWrist();
+        
+        if (wrist) {
+            tx = width - wrist.x;
+            ty = wrist.y;
+        } else if (touches.length > 0 || mouseIsPressed) {
+            tx = touches.length > 0 ? touches[0].x : mouseX;
+            ty = touches.length > 0 ? touches[0].y : mouseY;
+        }
 
+        if (tx !== -1 && ty !== -1) {
             for (let i = 0; i < 3; i++) {
-                let d = dist(tx, ty, currentChoices[i].cx, currentChoices[i].cy);
-                if (d < 50) { 
+                // เช็คว่าจุดเซ็นเซอร์เข้าไปในเขตกล่องข้อความหรือเปล่า
+                if (abs(tx - currentChoices[i].cx) < 80 && abs(ty - currentChoices[i].cy) < 40) { 
                     if (currentChoices[i].word === targetWord.word) {
                         score++; playSound('correct');
                     } else {
@@ -178,16 +221,14 @@
         let seconds = Math.ceil(timeLeft / 1000);
         textAlign(CENTER, TOP); textSize(30); fill(255); text(`Time: ${seconds}s`, width/2, 60);
 
-        // แสดงรูปภาพที่อัปโหลดตรงกลางจอ
         let img = vocabImages[targetWord.word];
-        if (img) {
+        if (img && img.width > 0) {
             imageMode(CENTER);
-            image(img, width/2, height/2 - 40, 180, 180); // ปรับขนาดรูปตรงเลข 180, 180 ได้ครับ
+            image(img, width/2, height/2 - 40, 180, 180); 
             imageMode(CORNER);
         } else {
-            // ถ้ายังไม่ได้อัปโหลดรูป จะแสดงข้อความแทนชั่วคราว
             textAlign(CENTER, CENTER); textSize(40); fill(255, 255, 255, 150);
-            text("[ กำลังรอรูป " + targetWord.word + ".png ]", width/2, height/2 - 40);
+            text("[ รูป " + targetWord.word + ".png ]", width/2, height/2 - 40);
         }
 
         let boxW = 160, boxH = 60, gap = 20;
@@ -196,24 +237,13 @@
         for (let i = 0; i < 3; i++) {
             let cx = startX + i * (boxW + gap) + boxW / 2;
             let cy = height - 80;
-            
             currentChoices[i].cx = cx; currentChoices[i].cy = cy;
 
             rectMode(CENTER); fill(255, 255, 255, 200); stroke(0); strokeWeight(2);
             rect(cx, cy, boxW, boxH, 15);
-
             fill(0); noStroke(); textSize(24); textAlign(CENTER, CENTER);
             text(currentChoices[i].word.toUpperCase(), cx, cy);
             rectMode(CORNER);
-        }
-    }
-
-    function drawMagicWand() {
-        if (touches.length > 0 || mouseIsPressed) {
-            let tx = touches.length > 0 ? touches[0].x : mouseX;
-            let ty = touches.length > 0 ? touches[0].y : mouseY;
-            fill(249, 115, 22); ellipse(tx, ty, 20, 20);
-            textAlign(CENTER, CENTER); textSize(40); text('🪄', tx + 20, ty - 20);
         }
     }
 
