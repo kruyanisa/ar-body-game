@@ -15,7 +15,6 @@
         .btn { position: absolute; z-index: 10; padding: 10px 15px; font-size: 16px; font-weight: bold; border-radius: 8px; color: white; border: none; cursor: pointer; font-family: 'Sarabun', sans-serif; transition: 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         .btn:hover { transform: scale(1.05); }
         #muteBtn { top: 20px; left: 20px; background: #ef4444; }
-        /* ขยายระยะห่างระหว่างปุ่มเริ่มใหม่กับจบเกม ไม่ให้ซ้อนกัน */
         #restartBtn { top: 20px; right: 135px; background: #3b82f6; }
         #endBtn { top: 20px; right: 20px; background: #64748b; }
     </style>
@@ -38,17 +37,19 @@
     let sessionVocab = []; 
     let vocabImages = {}; 
     
-    let smoothedSensorPos = [0, 0];
+    // ตั้งค่าเริ่มต้นของเซ็นเซอร์ให้อยู่ใต้จอด้านล่าง เพื่อไม่ให้บินพาดปุ่มตอนเริ่มเกม
+    let smoothedSensorPos = [320, 1000]; 
     
-    // ระบบหน่วงเวลาโชว์เฉลย
     let isFeedbackState = false;
     let feedbackTimer = 0;
     let selectedButtonIndex = -1;
     let isCorrectAnswer = false;
 
-    // ระบบนับถอยหลังก่อนเริ่มเกม
     let countdownNum = 3;
     let countdownTimer = 0;
+    
+    // เพิ่มตัวแปรหน่วงเวลาตอนเริ่มข้อใหม่ ป้องกันการลั่น
+    let questionStartTime = 0; 
 
     const vocabList = [
         { word: 'body' }, { word: 'head' }, { word: 'hair' }, { word: 'face' },
@@ -81,6 +82,8 @@
         env = new p5.Envelope();
         osc.start();
         osc.amp(env);
+        
+        smoothedSensorPos = [width / 2, height + 200];
     }
 
     function windowResized() {
@@ -104,6 +107,7 @@
         state = 'COUNTDOWN';
         countdownNum = 3;
         countdownTimer = millis() + 1000;
+        smoothedSensorPos = [width / 2, height + 200]; // รีเซ็ตตำแหน่งมือไปใต้จอ
     }
 
     function nextQuestion() {
@@ -121,6 +125,9 @@
         
         isFeedbackState = false;
         selectedButtonIndex = -1;
+        
+        // กางโล่อมตะ 0.5 วินาทีตอนขึ้นข้อใหม่
+        questionStartTime = millis() + 500;
     }
 
     function mousePressed(event) {
@@ -143,7 +150,8 @@
     }
     
     function restartGame() {
-        score = 0; currentQuestion = 0; fireworks = []; smoothedSensorPos = [0, 0];
+        score = 0; currentQuestion = 0; fireworks = []; 
+        smoothedSensorPos = [width / 2, height + 200];
         isFeedbackState = false;
         sessionVocab = shuffle([...vocabList]).slice(0, maxQuestions);
         document.getElementById('bgMusic').currentTime = 0;
@@ -157,7 +165,6 @@
     }
 
     function draw() {
-        // ถ้าสถานะเป็นจบเกม (END) จะดับจอกล้องทันที และเปลี่ยนเป็นพื้นหลังสีมืดแทนเพื่อความเคลียร์
         if (state === 'END') {
             background('#1e293b');
         } else {
@@ -232,6 +239,9 @@
             smoothedSensorPos[0] = lerp(smoothedSensorPos[0], sensorPos[0], 0.3);
             smoothedSensorPos[1] = lerp(smoothedSensorPos[1], sensorPos[1], 0.3);
 
+            // ถ้าอยู่ในช่วงโล่อมตะ 0.5 วินาทีแรก จะไม่รับการชนใดๆ ทั้งสิ้น
+            if (millis() < questionStartTime) return;
+
             for (let i = 0; i < 3; i++) {
                 let hitW = currentChoices[i].hitW || 120;
                 let hitH = currentChoices[i].hitH || 60;
@@ -256,7 +266,6 @@
     }
 
     function drawGameUI() {
-        // ขยับพิกัดตัวอักษรลงมาที่ระยะ Y = 90 เพื่อไม่ให้ปุ่ม HTML ทับข้อความตัวเลข
         fill(255); textAlign(LEFT, TOP); textSize(24); textStyle(BOLD); text(`Score: ${score}`, 20, 90); 
         textAlign(RIGHT, TOP); text(`${currentQuestion} / ${maxQuestions}`, width - 20, 90);
         
@@ -281,7 +290,6 @@
         let gap = (availableWidth - (boxW * 3)) / 2; 
         let startX = screenPadding; 
 
-        // ขยับกลุ่มปุ่มลงมาเล็กน้อยที่ Y = 160 เพื่อความสมดุลและสวยงาม
         for (let i = 0; i < 3; i++) {
             let cx = startX + i * (boxW + gap) + boxW / 2;
             let cy = 160; 
