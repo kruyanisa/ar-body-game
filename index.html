@@ -9,11 +9,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;800&family=Sarabun:wght@700&display=swap" rel="stylesheet">
     <style>
         body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #1e293b; overflow: hidden; font-family: 'Poppins', 'Sarabun', sans-serif; touch-action: none; }
-        
-        /* สร้างกล่องบรรจุเกมให้อยู่ตรงกลาง และรวมปุ่มไว้ข้างใน */
         #game-container { position: relative; width: 95%; max-width: 800px; aspect-ratio: 4/3; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         canvas { width: 100% !important; height: 100% !important; border-radius: 15px; display: block; touch-action: none; }
-        
         .btn { position: absolute; z-index: 10; padding: 8px 12px; font-size: 14px; font-weight: bold; border-radius: 8px; color: white; border: none; cursor: pointer; font-family: 'Sarabun', sans-serif; transition: 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         .btn:hover { transform: scale(1.05); }
         #muteBtn { top: 15px; left: 15px; background: #ef4444; }
@@ -22,7 +19,6 @@
     </style>
 </head>
 <body>
-    
     <div id="game-container">
         <audio id="bgMusic" loop src="Poosaokalor.mp3"></audio>
         <button id="muteBtn" class="btn" onclick="toggleMute()">🔊 Mute</button>
@@ -38,6 +34,10 @@
     let currentChoices = [];
     let sessionVocab = []; 
     let vocabImages = {}; 
+    
+    // ระบบเซ็นเซอร์และกันคลิกซ้อน
+    let sensorX = -1, sensorY = -1;
+    let inputCooldown = 0; // หน่วงเวลากันเด็กแช่มือค้าง
     
     const vocabList = [
         { word: 'body' }, { word: 'head' }, { word: 'hair' }, { word: 'face' },
@@ -56,7 +56,6 @@
     }
 
     function setup() {
-        // ย้าย Canvas เข้าไปอยู่ในกล่อง #game-container
         let cnv = createCanvas(640, 480);
         cnv.parent('game-container');
         cnv.style('touch-action', 'none'); 
@@ -97,6 +96,9 @@
         timeLeft = 8000;
         lastTime = millis();
         currentQuestion++;
+        
+        // หน่วงเวลา 1 วินาทีหลังจากเปลี่ยนข้อ ป้องกันมือค้างรันยาว
+        inputCooldown = millis() + 1000; 
     }
 
     function mousePressed(event) {
@@ -132,13 +134,13 @@
         document.getElementById('bgMusic').pause();
     }
 
-    // ฟังก์ชันช่วยหาข้อมือที่ชัดที่สุด
     function getActiveWrist() {
         if (poses.length > 0) {
             let pose = poses[0].pose;
             let lw = pose.leftWrist;
             let rw = pose.rightWrist;
-            if (lw.confidence > 0.2 || rw.confidence > 0.2) {
+            // เพิ่มเกณฑ์ความแม่นยำเป็น 0.4 (จากเดิม 0.2) กล้องจะได้ไม่จับจุดมั่ว
+            if (lw.confidence > 0.4 || rw.confidence > 0.4) {
                 return (lw.confidence > rw.confidence) ? lw : rw;
             }
         }
@@ -154,7 +156,7 @@
         } else if (state === 'PLAY') {
             runGameLogic();
             drawGameUI();
-            drawSensor(); // วาดเซ็นเซอร์ข้อมือ
+            drawSensor(); 
         } else if (state === 'END') {
             drawUI('GAME OVER', `Score: ${score}/${maxQuestions}\nTap to Try Again`, 50, width/2, height/2, score >= 5 ? '#10b981' : '#ef4444');
             if (score >= maxQuestions / 2) runFireworks();
@@ -162,20 +164,15 @@
     }
 
     function drawSensor() {
-        let tx = -1, ty = -1;
-        let wrist = getActiveWrist();
-        
-        if (wrist) {
-            tx = width - wrist.x; // พิกัดข้อมือ
-            ty = wrist.y;
-        } else if (touches.length > 0 || mouseIsPressed) {
-            tx = touches.length > 0 ? touches[0].x : mouseX; // พิกัดนิ้ว/เมาส์สำรอง
-            ty = touches.length > 0 ? touches[0].y : mouseY;
-        }
-
-        if (tx !== -1 && ty !== -1) {
-            fill(249, 115, 22); stroke(255); strokeWeight(3);
-            ellipse(tx, ty, 35, 35); // วาดจุดเซ็นเซอร์สีส้ม
+        if (sensorX !== -1 && sensorY !== -1) {
+            // ถ้าระบบยังอยู่ในช่วงพัก Cooldown จะเป็นสีเทา ถ้าพร้อมเล่นจะเป็นสีส้ม
+            if (millis() < inputCooldown) {
+                fill(150, 150, 150, 150); 
+            } else {
+                fill(249, 115, 22); 
+            }
+            stroke(255); strokeWeight(3);
+            ellipse(sensorX, sensorY, 35, 35); 
             noStroke();
         }
     }
@@ -183,8 +180,11 @@
     function runGameLogic() {
         let dt = millis() - lastTime;
         lastTime = millis();
-        timeLeft -= dt;
+        
+        // ถ้าระบบพักอยู่ ให้หยุดเวลาและหยุดการทำงานทั้งหมดชั่วคราว (1 วินาที)
+        if (millis() < inputCooldown) return;
 
+        timeLeft -= dt;
         if (timeLeft <= 0) { playSound('wrong'); nextQuestion(); return; }
 
         let tx = -1, ty = -1;
@@ -199,9 +199,16 @@
         }
 
         if (tx !== -1 && ty !== -1) {
+            // ระบบ Smoothing (lerp) ทำให้จุดสีส้มวิ่งเนียนๆ ไม่กระตุก
+            if (sensorX === -1) { 
+                sensorX = tx; sensorY = ty; 
+            } else { 
+                sensorX = lerp(sensorX, tx, 0.3); 
+                sensorY = lerp(sensorY, ty, 0.3); 
+            }
+
             for (let i = 0; i < 3; i++) {
-                // เช็คว่าจุดเซ็นเซอร์เข้าไปในเขตกล่องข้อความหรือเปล่า
-                if (abs(tx - currentChoices[i].cx) < 80 && abs(ty - currentChoices[i].cy) < 40) { 
+                if (abs(sensorX - currentChoices[i].cx) < 80 && abs(sensorY - currentChoices[i].cy) < 40) { 
                     if (currentChoices[i].word === targetWord.word) {
                         score++; playSound('correct');
                     } else {
@@ -211,6 +218,8 @@
                     return;
                 }
             }
+        } else {
+            sensorX = -1; // รีเซ็ตตำแหน่งถ้าหากล้องไม่เจอมือ
         }
     }
 
