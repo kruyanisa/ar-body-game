@@ -38,7 +38,12 @@
     let vocabImages = {}; 
     
     let smoothedSensorPos = [0, 0];
-    let handNeedsReset = false; // ตัวแปรล็อกระบบ ต้องเอามือลงก่อนถึงจะตอบข้อต่อไปได้
+    
+    // ระบบหน่วงเวลาโชว์เฉลย (Feedback System)
+    let isFeedbackState = false;
+    let feedbackTimer = 0;
+    let selectedButtonIndex = -1;
+    let isCorrectAnswer = false;
 
     const vocabList = [
         { word: 'body' }, { word: 'head' }, { word: 'hair' }, { word: 'face' },
@@ -103,7 +108,9 @@
         lastTime = millis();
         currentQuestion++;
         
-        handNeedsReset = true; // ล็อกปุ่มทันทีที่เปลี่ยนข้อ
+        // รีเซ็ตค่าสถานะเฉลย
+        isFeedbackState = false;
+        selectedButtonIndex = -1;
     }
 
     function mousePressed(event) {
@@ -128,7 +135,7 @@
     
     function restartGame() {
         state = 'PLAY'; score = 0; currentQuestion = 0; fireworks = []; smoothedSensorPos = [0, 0];
-        handNeedsReset = false;
+        isFeedbackState = false;
         sessionVocab = shuffle([...vocabList]).slice(0, maxQuestions);
         document.getElementById('bgMusic').currentTime = 0;
         document.getElementById('bgMusic').play().catch(e => console.log(e));
@@ -158,8 +165,16 @@
     function runGameLogic() {
         let dt = millis() - lastTime;
         lastTime = millis();
-        timeLeft -= dt;
 
+        // ถ้าอยู่ในช่วงหน่วงเวลาโชว์เฉลย ให้จับเวลาถอยหลังอย่างเดียว ไม่รับคำสั่งมือถือ/กล้อง
+        if (isFeedbackState) {
+            if (millis() > feedbackTimer) {
+                nextQuestion(); // หมดเวลาหน่วง ข้ามไปข้อต่อไป
+            }
+            return; 
+        }
+
+        timeLeft -= dt;
         if (timeLeft <= 0) { playSound('wrong'); nextQuestion(); return; }
 
         let active = false;
@@ -172,43 +187,37 @@
             
             if (lw.confidence > 0.4 || rw.confidence > 0.4) {
                 let activeWrist = (lw.confidence > rw.confidence) ? lw : rw;
-                
-                // ขยับจุดรับสัมผัสให้สูงขึ้น 80 pixel เพื่อให้อยู่ตรง "ฝ่ามือ" แทนที่จะเป็น "ข้อมือ"
-                sensorPos = [width - activeWrist.x, activeWrist.y - 80]; 
+                sensorPos = [width - activeWrist.x, activeWrist.y - 80]; // ชดเชยจุดขึ้นไปตรงฝ่ามือ
                 active = true;
             }
         }
 
         if (active) {
-            // ระบบช่วยให้เซ็นเซอร์วิ่งเนียนขึ้น ไม่กระตุก
             smoothedSensorPos[0] = lerp(smoothedSensorPos[0], sensorPos[0], 0.3);
             smoothedSensorPos[1] = lerp(smoothedSensorPos[1], sensorPos[1], 0.3);
 
-            if (handNeedsReset) {
-                // ถ้าเกมล็อกอยู่ ให้ปลดล็อกเมื่อเอามือลงต่ำกว่าระดับของปุ่ม (height - 100)
-                if (smoothedSensorPos[1] > height - 100) {
-                    handNeedsReset = false;
-                }
-            } else {
-                // ถ้าปลดล็อกแล้ว ให้ตรวจจับการชนปุ่ม (แตะปุ๊บติดปั๊บ)
-                for (let i = 0; i < 3; i++) {
-                    let hitW = currentChoices[i].hitW || 120;
-                    let hitH = currentChoices[i].hitH || 60;
+            // ตรวจจับการชนปุ่ม (แตะปุ๊บติดปั๊บ)
+            for (let i = 0; i < 3; i++) {
+                let hitW = currentChoices[i].hitW || 120;
+                let hitH = currentChoices[i].hitH || 60;
+                
+                if (abs(smoothedSensorPos[0] - currentChoices[i].cx) < hitW && abs(smoothedSensorPos[1] - currentChoices[i].cy) < hitH) { 
+                    selectedButtonIndex = i;
                     
-                    if (abs(smoothedSensorPos[0] - currentChoices[i].cx) < hitW && abs(smoothedSensorPos[1] - currentChoices[i].cy) < hitH) { 
-                        if (currentChoices[i].word === targetWord.word) {
-                            score++; playSound('correct');
-                        } else {
-                            playSound('wrong');
-                        }
-                        nextQuestion();
-                        return; // จบการทำงานรอบนี้ทันที
+                    if (currentChoices[i].word === targetWord.word) {
+                        score++; playSound('correct');
+                        isCorrectAnswer = true;
+                    } else {
+                        playSound('wrong');
+                        isCorrectAnswer = false;
                     }
+                    
+                    // เปิดใช้งานสถานะหน่วงเวลา 1.5 วินาที (1500 มิลลิวินาที)
+                    isFeedbackState = true;
+                    feedbackTimer = millis() + 1500; 
+                    return; 
                 }
             }
-        } else {
-            // ถ้าหากล้องไม่เจอมือ (เช่น เอามือหลบกล้อง) ให้ปลดล็อกระบบทันที
-            handNeedsReset = false; 
         }
     }
 
@@ -248,17 +257,25 @@
 
             rectMode(CENTER); 
             
-            // เปลี่ยนสีปุ่มเพื่อสื่อสารกับผู้เล่น: สีเทา = ล็อกอยู่ (ต้องเอามือลง), สีขาวสว่าง = พร้อมแตะ
-            if (handNeedsReset) {
-                fill(150, 150, 150, 180); // สีเทา
+            // --- ระบบเปลี่ยนสีปุ่มเฉลยตอนตอบ ---
+            if (isFeedbackState && i === selectedButtonIndex) {
+                if (isCorrectAnswer) {
+                    fill(46, 204, 113); // ตอบถูก เปลี่ยนเป็นสีเขียวเด่นชัด
+                } else {
+                    fill(231, 76, 60); // ตอบผิด เปลี่ยนเป็นสีแดง
+                }
             } else {
-                fill(255, 255, 255, 240); // สีขาวสว่าง
+                fill(255, 255, 255, 240); // สีขาวปกติระหว่างเล่น
             }
             
             stroke(0); strokeWeight(2);
             rect(cx, cy, boxW, boxH, 15);
 
-            fill(0); noStroke(); textSize(min(24, boxW * 0.18)); textAlign(CENTER, CENTER);
+            // ตัวหนังสือในปุ่ม (ถ้าปุ่มเปลี่ยนสี ตัวหนังสือจะเปลี่ยนเป็นสีขาวเพื่อให้มองง่าย)
+            if (isFeedbackState && i === selectedButtonIndex) fill(255);
+            else fill(0);
+            
+            noStroke(); textSize(min(24, boxW * 0.18)); textAlign(CENTER, CENTER);
             text(currentChoices[i].word.toUpperCase(), cx, cy);
             rectMode(CORNER);
         }
@@ -269,6 +286,7 @@
         fill(c); textSize(size); text(t1, x, y - 30); fill(255); textSize(20); text(t2, x, y + 40);
     }
 
+    // ฟังก์ชันสลับอาร์เรย์
     function shuffle(array) {
         let currentIndex = array.length, randomIndex;
         while (currentIndex !== 0) {
