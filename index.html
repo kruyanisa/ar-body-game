@@ -3,86 +3,184 @@
 <head>
     <meta charset="UTF-8">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/addons/p5.sound.min.js"></script>
     <script src="https://unpkg.com/ml5@0.12.2/dist/ml5.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;800&family=Sarabun:wght@700&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; display: flex; justify-content: center; align-items: center; background-color: transparent; overflow: hidden; }
-        canvas { border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        body { margin: 0; display: flex; justify-content: center; align-items: center; background-color: #1e293b; overflow: hidden; font-family: 'Poppins', sans-serif; }
+        canvas { border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
     </style>
 </head>
 <body>
 <script>
-    let video;
-    let poseNet;
-    let poses = [];
+    let video, poseNet, poses = [];
+    let state = 'START'; // START, PLAY, END
+    let score = 0, currentQuestion = 0, maxQuestions = 10;
+    let targetWord = null, timeLeft = 8000, lastTime = 0;
+    
+    // คำศัพท์ที่แมตช์กับจุดของ PoseNet
+    const vocabList = [
+        { word: 'nose', parts: ['nose'] },
+        { word: 'eye', parts: ['leftEye', 'rightEye'] },
+        { word: 'ear', parts: ['leftEar', 'rightEar'] },
+        { word: 'shoulder', parts: ['leftShoulder', 'rightShoulder'] },
+        { word: 'arm', parts: ['leftElbow', 'rightElbow'] },
+        { word: 'leg', parts: ['leftKnee', 'rightKnee'] },
+        { word: 'foot', parts: ['leftAnkle', 'rightAnkle'] }
+    ];
+
+    let osc, env;
+    let fireworks = [];
 
     function setup() {
         createCanvas(640, 480);
         video = createCapture(VIDEO);
         video.size(width, height);
-        
-        // เรียกใช้ AI จับการเคลื่อนไหว
-        poseNet = ml5.poseNet(video, modelReady);
-        poseNet.on('pose', function(results) {
-            poses = results;
-        });
-        
+        poseNet = ml5.poseNet(video, () => console.log('Model Loaded'));
+        poseNet.on('pose', results => poses = results);
         video.hide();
-        textFont('Poppins');
+        
+        // Setup Audio Synthesizer
+        osc = new p5.Oscillator();
+        env = new p5.Envelope();
+        osc.start();
+        osc.amp(env);
     }
 
-    function modelReady() {
-        console.log('Model Loaded');
+    function playSound(type) {
+        if (type === 'correct') {
+            osc.setType('sine'); osc.freq(880); env.play(osc, 0, 0.1, 0.1, 0.1, 0);
+        } else if (type === 'wrong') {
+            osc.setType('sawtooth'); osc.freq(150); env.play(osc, 0, 0.1, 0.3, 0.1, 0);
+        } else if (type === 'win') {
+            osc.setType('triangle');
+            setTimeout(() => { osc.freq(523.25); env.play(osc, 0, 0.1, 0.1, 0.1, 0); }, 0);
+            setTimeout(() => { osc.freq(659.25); env.play(osc, 0, 0.1, 0.1, 0.1, 0); }, 150);
+            setTimeout(() => { osc.freq(783.99); env.play(osc, 0, 0.1, 0.1, 0.1, 0); }, 300);
+            setTimeout(() => { osc.freq(1046.50); env.play(osc, 0, 0.1, 0.3, 0.5, 0); }, 450);
+        }
+    }
+
+    function nextQuestion() {
+        if (currentQuestion >= maxQuestions) {
+            state = 'END';
+            if (score === maxQuestions) playSound('win');
+            return;
+        }
+        targetWord = random(vocabList);
+        timeLeft = 8000;
+        lastTime = millis();
+        currentQuestion++;
+    }
+
+    function mousePressed() {
+        if (state === 'START') { state = 'PLAY'; nextQuestion(); }
+        else if (state === 'END') { state = 'START'; score = 0; currentQuestion = 0; fireworks = []; }
+        userStartAudio(); // บังคับอนุญาตเล่นเสียงบน Browser
     }
 
     function draw() {
-        // วาดภาพจากกล้อง
-        push();
-        translate(width, 0);
-        scale(-1, 1);
-        image(video, 0, 0, width, height);
-        pop();
+        push(); translate(width, 0); scale(-1, 1); image(video, 0, 0, width, height); pop();
+        fill(0, 0, 0, 100); rect(0, 0, width, height); // Darken video
 
-        // วาดจุดและคำศัพท์บนร่างกาย
-        drawKeypoints();
+        if (state === 'START') {
+            drawUI('Touch to Start', 'เอาข้อมือแตะที่จุดเพื่อเก็บคะแนน!', 40, width/2, height/2);
+        } else if (state === 'PLAY') {
+            runGameLogic();
+            drawKeypoints();
+            drawGameUI();
+        } else if (state === 'END') {
+            if (score === maxQuestions) {
+                drawUI('PERFECT!', `Score: ${score}/${maxQuestions}`, 60, width/2, height/2 - 20, '#10b981');
+                runFireworks();
+            } else {
+                drawUI('GAME OVER', `Score: ${score}/${maxQuestions}\nTap to Try Again`, 50, width/2, height/2, '#ef4444');
+            }
+        }
     }
 
-    function drawKeypoints()  {
-        for (let i = 0; i < poses.length; i++) {
-            let pose = poses[i].pose;
-            for (let j = 0; j < pose.keypoints.length; j++) {
-                let keypoint = pose.keypoints[j];
-                
-                if (keypoint.score > 0.2) {
-                    let x = width - keypoint.position.x; 
-                    let y = keypoint.position.y;
+    function runGameLogic() {
+        let dt = millis() - lastTime;
+        lastTime = millis();
+        timeLeft -= dt;
 
-                    // วาดจุดสีส้ม
-                    fill(249, 115, 22);
-                    noStroke();
-                    ellipse(x, y, 15, 15);
-                    
-                    // แปลงข้อความจาก camelCase เป็นพิมพ์เล็กเว้นวรรค (เช่น leftEye -> left eye)
-                    let partName = keypoint.part.replace(/([A-Z])/g, ' $1').toLowerCase();
-                    
-                    // ตั้งค่าฟอนต์
-                    fill(255);
-                    stroke(0);
-                    strokeWeight(3);
-                    textSize(20);
-                    
-                    // ผลักตัวหนังสือออกด้านนอกหน้า เพื่อไม่ให้ซ้อนทับกันตรงกลาง
-                    if (x < width / 2) {
-                        // จุดอยู่ครึ่งซ้ายของจอ -> ให้ตัวหนังสืออยู่ซ้ายมือของจุด
-                        textAlign(RIGHT, CENTER);
-                        text(partName, x - 15, y);
-                    } else {
-                        // จุดอยู่ครึ่งขวาของจอ -> ให้ตัวหนังสืออยู่ขวามือของจุด
-                        textAlign(LEFT, CENTER);
-                        text(partName, x + 15, y);
+        if (timeLeft <= 0) {
+            playSound('wrong');
+            nextQuestion();
+        }
+
+        // ตรวจสอบการชนกันระหว่างข้อมือ (Wrist) กับคำเป้าหมาย
+        if (poses.length > 0) {
+            let pose = poses[0].pose;
+            let wrists = [pose.leftWrist, pose.rightWrist].filter(w => w.score > 0.2);
+            let targets = pose.keypoints.filter(k => targetWord.parts.includes(k.part) && k.score > 0.2);
+
+            for (let w of wrists) {
+                for (let t of targets) {
+                    let d = dist(w.x, w.y, t.position.x, t.position.y);
+                    if (d < 60) { // ระยะการสัมผัส 60px
+                        score++;
+                        playSound('correct');
+                        nextQuestion();
+                        return;
                     }
                 }
             }
+        }
+    }
+
+    function drawGameUI() {
+        fill(255); textAlign(LEFT, TOP); textSize(24); textStyle(BOLD);
+        text(`Score: ${score}`, 20, 20);
+        textAlign(RIGHT, TOP);
+        text(`${currentQuestion} / ${maxQuestions}`, width - 20, 20);
+        
+        let seconds = Math.ceil(timeLeft / 1000);
+        textAlign(CENTER, TOP); textSize(60); fill(seconds <= 3 ? '#ef4444' : '#facc15');
+        text(targetWord.word.toUpperCase(), width/2, 20);
+        textSize(30); fill(255);
+        text(`Time: ${seconds}s`, width/2, 90);
+    }
+
+    function drawUI(t1, t2, size, x, y, c = '#38bdf8') {
+        textAlign(CENTER, CENTER); textStyle(BOLD);
+        fill(c); textSize(size); text(t1, x, y - 30);
+        fill(255); textSize(20); text(t2, x, y + 40);
+    }
+
+    function drawKeypoints() {
+        if (poses.length > 0) {
+            let pose = poses[0].pose;
+            for (let j = 0; j < pose.keypoints.length; j++) {
+                let keypoint = pose.keypoints[j];
+                if (keypoint.score > 0.2) {
+                    let x = width - keypoint.position.x;
+                    let y = keypoint.position.y;
+                    
+                    // ไฮไลต์สีเขียวถ้าเป็นเป้าหมาย สีส้มถ้าเป็นมือ สีขาวถ้าเป็นจุดอื่น
+                    if (targetWord.parts.includes(keypoint.part)) { fill(16, 185, 129); ellipse(x, y, 30, 30); } 
+                    else if (keypoint.part.includes('Wrist')) { fill(249, 115, 22); ellipse(x, y, 25, 25); } 
+                    else { fill(255, 100); ellipse(x, y, 10, 10); }
+                }
+            }
+        }
+    }
+
+    // ระบบพลุฉลอง
+    class Particle {
+        constructor(x, y, c) { this.x = x; this.y = y; this.vx = random(-5, 5); this.vy = random(-5, 5); this.alpha = 255; this.c = c; }
+        update() { this.x += this.vx; this.y += this.vy; this.alpha -= 5; }
+        show() { noStroke(); fill(this.c[0], this.c[1], this.c[2], this.alpha); ellipse(this.x, this.y, 8); }
+    }
+    function runFireworks() {
+        if (random(1) < 0.1) {
+            let c = [random(255), random(255), random(255)];
+            let x = random(width), y = random(height/2);
+            for(let i=0; i<30; i++) fireworks.push(new Particle(x, y, c));
+        }
+        for (let i = fireworks.length - 1; i >= 0; i--) {
+            fireworks[i].update(); fireworks[i].show();
+            if (fireworks[i].alpha <= 0) fireworks.splice(i, 1);
         }
     }
 </script>
