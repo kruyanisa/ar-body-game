@@ -8,7 +8,6 @@
     <script src="https://unpkg.com/ml5@0.12.2/dist/ml5.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;800&family=Sarabun:wght@700&display=swap" rel="stylesheet">
     <style>
-        /* ล้างขอบหน้าจอและเซ็ตให้เต็ม 100% */
         body { margin: 0; padding: 0; background-color: #1e293b; overflow: hidden; font-family: 'Poppins', 'Sarabun', sans-serif; touch-action: none; }
         #game-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; }
         canvas { display: block; touch-action: none; }
@@ -58,7 +57,6 @@
     }
 
     function setup() {
-        // ให้ Canvas สร้างขนาดกว้าง/ยาว เท่ากับหน้าจออุปกรณ์ที่เปิดอยู่แบบ 100%
         let cnv = createCanvas(windowWidth, windowHeight);
         cnv.parent('game-container');
         cnv.style('touch-action', 'none'); 
@@ -75,7 +73,6 @@
         osc.amp(env);
     }
 
-    // ฟังก์ชันคำนวณสัดส่วนใหม่ทันทีที่หมุนจอมือถือ หรือย่อหน้าต่างเบราว์เซอร์
     function windowResized() {
         resizeCanvas(windowWidth, windowHeight);
         video.size(windowWidth, windowHeight);
@@ -83,9 +80,9 @@
 
     function playSound(type) {
         if (type === 'correct') {
-            osc.setType('sine'); osc.freq(880); env.play(osc, 0, 0.1, 0.1, 0.1, 0);
+            osc.setType('sine'); osc.freq(880); env.play(osc, 0, 0.1, 0.1, 0.1, 0); // เสียงแหลมปิ๊ง (ถูก)
         } else if (type === 'wrong') {
-            osc.setType('sawtooth'); osc.freq(150); env.play(osc, 0, 0.1, 0.3, 0.1, 0);
+            osc.setType('sawtooth'); osc.freq(150); env.play(osc, 0, 0.1, 0.3, 0.1, 0); // เสียงทุ้มแป๊ด (ผิด)
         } else if (type === 'win') {
             osc.setType('triangle');
             setTimeout(() => { osc.freq(523.25); env.play(osc, 0, 0.1, 0.1, 0.1, 0); }, 0);
@@ -178,19 +175,20 @@
             }
 
             if (active) {
+                // อัปเดตพิกัดมือที่ซ่อนอยู่
                 smoothedSensorPos[0] = lerp(smoothedSensorPos[0], sensorPos[0], 0.3);
                 smoothedSensorPos[1] = lerp(smoothedSensorPos[1], sensorPos[1], 0.3);
-
-                if (millis() < selectionCooldown) {
-                    fill(150, 150, 150, 150); 
-                } else {
-                    fill(249, 115, 22); 
-                }
-                ellipse(smoothedSensorPos[0], smoothedSensorPos[1], 35, 35);
+                
+                // เอาโค้ดวาดจุดสีส้มออกไปแล้ว! ปล่อยให้มือเป็นตัวควบคุมแบบไร้รอยต่อ
 
                 if (millis() > selectionCooldown) {
                     for (let i = 0; i < 3; i++) {
-                        if (abs(smoothedSensorPos[0] - currentChoices[i].cx) < 100 && abs(smoothedSensorPos[1] - currentChoices[i].cy) < 50) { 
+                        // ดึงขนาดพื้นที่รับสัมผัส (Hitbox) ที่คำนวณไว้ตอนวาดปุ่ม
+                        let hitAreaX = currentChoices[i].hitW || 120;
+                        let hitAreaY = currentChoices[i].hitH || 60;
+                        
+                        // ตรวจสอบว่ามือเข้าใกล้ปุ่มในระยะ Hitbox หรือไม่
+                        if (abs(smoothedSensorPos[0] - currentChoices[i].cx) < hitAreaX && abs(smoothedSensorPos[1] - currentChoices[i].cy) < hitAreaY) { 
                             if (currentChoices[i].word === targetWord.word) {
                                 score++; playSound('correct');
                                 selectionCooldown = millis() + 1000; 
@@ -207,7 +205,6 @@
     }
 
     function drawGameUI() {
-        // UI ข้อความถูกปรับให้อิงตามขนาดหน้าจอ (ยืดหยุ่นไม่ตกขอบ)
         fill(255); textAlign(LEFT, TOP); textSize(24); textStyle(BOLD); text(`Score: ${score}`, 20, 80); 
         textAlign(RIGHT, TOP); text(`${currentQuestion} / ${maxQuestions}`, width - 20, 80);
         
@@ -224,16 +221,25 @@
             text("[ รูป " + targetWord.word + ".png ]", width/2, height/2 - 40);
         }
 
-        // ปรับขนาดกล่องตัวเลือกให้ยืดหยุ่นตามหน้าจอมือถือ/คอม
-        let boxW = min(160, (width - 60) / 3); 
-        let boxH = min(60, height * 0.1);
-        let gap = min(20, width * 0.05);
-        let startX = (width - (3 * boxW + 2 * gap)) / 2;
+        // --- ระบบคำนวณถ่างปุ่มให้ชิดขอบซ้าย/ขวา ---
+        let screenPadding = width * 0.05; // เว้นระยะขอบจอ 5%
+        let boxW = min(200, width * 0.26); // ปุ่มกว้างสุด 200px
+        let boxH = min(70, height * 0.12);
+        
+        // คำนวณหาช่องว่าง (Gap) โดยเอาพื้นที่ที่เหลือมาหารแบ่งให้เท่าๆ กัน
+        let availableWidth = width - (screenPadding * 2);
+        let gap = (availableWidth - (boxW * 3)) / 2; 
+        let startX = screenPadding; // เริ่มวาดปุ่มแรกจากขอบจอ
 
         for (let i = 0; i < 3; i++) {
             let cx = startX + i * (boxW + gap) + boxW / 2;
-            let cy = height - boxH - 40; // ขยับกล่องลอยขึ้นจากขอบจอด้านล่างเสมอ
-            currentChoices[i].cx = cx; currentChoices[i].cy = cy;
+            let cy = height - boxH - 40; 
+            
+            currentChoices[i].cx = cx; 
+            currentChoices[i].cy = cy;
+            // บันทึกระยะพื้นที่รับสัมผัส (ให้กว้างกว่าปุ่มจริง 50px)
+            currentChoices[i].hitW = boxW / 2 + 50; 
+            currentChoices[i].hitH = boxH / 2 + 50;
 
             rectMode(CENTER); fill(255, 255, 255, 200); stroke(0); strokeWeight(2);
             rect(cx, cy, boxW, boxH, 15);
