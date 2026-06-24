@@ -38,7 +38,9 @@
     let vocabImages = {}; 
     
     let smoothedSensorPos = [0, 0];
-    let isWaitingForRelease = false; // ตัวแปรล็อกระบบสำหรับป้องกันการเอามือลงแล้วลั่นซ้ำ
+    let selectionCooldown = 0; 
+    let hoverTime = [0, 0, 0]; // เก็บเวลาทาบมือของทั้ง 3 ปุ่ม
+    const HOVER_REQUIRED = 1000; // ต้องแช่มือ 1 วินาที (1000 ms)
 
     const vocabList = [
         { word: 'body' }, { word: 'head' }, { word: 'hair' }, { word: 'face' },
@@ -103,8 +105,8 @@
         lastTime = millis();
         currentQuestion++;
         
-        // เมื่อขึ้นข้อใหม่ สั่งล็อกระบบทันทีจนกว่าผู้เล่นจะเอามือออกจากโซนปุ่มเดิม
-        isWaitingForRelease = true; 
+        hoverTime = [0, 0, 0]; // รีเซ็ตหลอดพลัง
+        selectionCooldown = millis() + 500; // พักครึ่งวินาทีก่อนเริ่มรับคำตอบข้อใหม่
     }
 
     function mousePressed(event) {
@@ -129,6 +131,7 @@
     
     function restartGame() {
         state = 'PLAY'; score = 0; currentQuestion = 0; fireworks = []; smoothedSensorPos = [0, 0];
+        hoverTime = [0, 0, 0];
         sessionVocab = shuffle([...vocabList]).slice(0, maxQuestions);
         document.getElementById('bgMusic').currentTime = 0;
         document.getElementById('bgMusic').play().catch(e => console.log(e));
@@ -162,57 +165,65 @@
 
         if (timeLeft <= 0) { playSound('wrong'); nextQuestion(); return; }
 
-        if (poses.length > 0) {
-            let wristL = poses[0].pose.leftWrist;
-            let wristR = poses[0].pose.rightWrist;
-            
-            let sensorPos = [0, 0];
-            let active = false;
+        let activeWrist = null;
 
-            if (wristL.confidence > 0.4 || wristR.confidence > 0.4) {
-                if (wristL.confidence > wristR.confidence) {
-                    sensorPos = [width - wristL.x, wristL.y]; active = true;
+        if (poses.length > 0) {
+            let pose = poses[0].pose;
+            let lw = pose.leftWrist;
+            let rw = pose.rightWrist;
+            let le = pose.leftElbow;
+            let re = pose.rightElbow;
+            
+            // กฎเหล็กข้อที่ 1: ความแม่นยำต้อง > 70% และ มือต้องอยู่สูงกว่าข้อศอก (y น้อยกว่าคืออยู่สูงกว่า)
+            let leftValid = lw.confidence > 0.7 && lw.y < le.y + 30; 
+            let rightValid = rw.confidence > 0.7 && rw.y < re.y + 30;
+
+            if (leftValid || rightValid) {
+                if (leftValid && rightValid) {
+                    activeWrist = lw.y < rw.y ? lw : rw; // ถ้าทััง 2 มือผ่านเกณฑ์ ให้เลือกมือที่ยกสูงกว่า
                 } else {
-                    sensorPos = [width - wristR.x, wristR.y]; active = true;
+                    activeWrist = leftValid ? lw : rw;
                 }
             }
+        }
 
-            if (active) {
-                smoothedSensorPos[0] = lerp(smoothedSensorPos[0], sensorPos[0], 0.3);
-                smoothedSensorPos[1] = lerp(smoothedSensorPos[1], sensorPos[1], 0.3);
-                
-                // ตรวจสอบว่าปัจจุบันพิกัดมืออยู่ในเขตปุ่มใดๆ หรือไม่
-                let handOverAnyButton = false;
-                let hoveredIndex = -1;
-                
+        if (activeWrist) {
+            smoothedSensorPos[0] = lerp(smoothedSensorPos[0], width - activeWrist.x, 0.3);
+            smoothedSensorPos[1] = lerp(smoothedSensorPos[1], activeWrist.y, 0.3);
+            
+            let isHovering = false;
+
+            if (millis() > selectionCooldown) {
                 for (let i = 0; i < 3; i++) {
                     let hitAreaX = currentChoices[i].hitW || 120;
                     let hitAreaY = currentChoices[i].hitH || 60;
+                    
                     if (abs(smoothedSensorPos[0] - currentChoices[i].cx) < hitAreaX && abs(smoothedSensorPos[1] - currentChoices[i].cy) < hitAreaY) { 
-                        handOverAnyButton = true;
-                        hoveredIndex = i;
-                    }
-                }
-
-                // ป้องกันบักตอนเอามือลง: หากยังล็อกอยู่และมือยังไม่เคลียร์ออกจากปุ่มเดิม ระบบจะหยุดทำงาน
-                if (isWaitingForRelease) {
-                    if (!handOverAnyButton) {
-                        isWaitingForRelease = false; // ปลดล็อกระบบเมื่อเอามือลงพ้นปุ่มทั้งหมดเรียบร้อยแล้ว
-                    }
-                    return; // ข้ามการเช็คคำตอบในเฟรมนี้ไปก่อน
-                }
-
-                // ทำงานตรวจจับคำตอบปกติเมื่อผู้เล่นชักมือลงไปแล้วยกขึ้นมาใหม่เรียบร้อย
-                if (!isWaitingForRelease && handOverAnyButton && hoveredIndex !== -1) {
-                    if (currentChoices[hoveredIndex].word === targetWord.word) {
-                        score++; playSound('correct');
+                        isHovering = true;
+                        hoverTime[i] += dt; // ชาร์จพลังหลอดสีเขียว
+                        
+                        // กฎเหล็กข้อที่ 2: ต้องแช่มือให้หลอดเต็ม 1 วินาที
+                        if (hoverTime[i] >= HOVER_REQUIRED) {
+                            if (currentChoices[i].word === targetWord.word) {
+                                score++; playSound('correct');
+                            } else {
+                                playSound('wrong');
+                            }
+                            nextQuestion();
+                            return;
+                        }
                     } else {
-                        playSound('wrong');
+                        hoverTime[i] = max(0, hoverTime[i] - dt * 3); // ถ้าเอามือออก หลอดจะค่อยๆ ลดลงอย่างรวดเร็ว
                     }
-                    nextQuestion();
-                    return;
                 }
             }
+
+            if (!isHovering) {
+                for (let i = 0; i < 3; i++) hoverTime[i] = max(0, hoverTime[i] - dt * 3);
+            }
+        } else {
+            // ถ้ายกมือลงจนกล้องจับไม่เจอ ให้รีเซ็ตหลอดพลังทั้งหมด
+            for (let i = 0; i < 3; i++) hoverTime[i] = max(0, hoverTime[i] - dt * 3);
         }
     }
 
@@ -250,17 +261,22 @@
             currentChoices[i].hitW = boxW / 2 + 15; 
             currentChoices[i].hitH = boxH / 2 + 15;
 
+            // คำนวณเปอร์เซ็นต์ความคืบหน้าของหลอดสีเขียว
+            let progress = constrain(hoverTime[i] / HOVER_REQUIRED, 0, 1);
+
             rectMode(CENTER); 
-            
-            // หากปุ่มใดอยู่ในสภาวะติดล็อกจากการที่เด็กยังไม่ชักมือลง จะเปลี่ยนเป็นสีเทาเพื่อแสดงผลให้รู้ตัว
-            if (isWaitingForRelease && abs(smoothedSensorPos[0] - cx) < currentChoices[i].hitW && abs(smoothedSensorPos[1] - cy) < currentChoices[i].hitH) {
-                fill(180, 180, 180, 200); 
-            } else {
-                fill(255, 255, 255, 200);
-            }
-            
-            stroke(0); strokeWeight(2);
+            fill(255, 255, 255, 200); stroke(0); strokeWeight(2);
             rect(cx, cy, boxW, boxH, 15);
+
+            // แสดงเอฟเฟกต์สีเขียวโหลดขึ้นมาเมื่อทาบมือ
+            if (progress > 0) {
+                rectMode(CORNER);
+                fill(16, 185, 129, 180); // สีเขียว
+                noStroke();
+                rect(cx - boxW/2, cy - boxH/2, boxW * progress, boxH, 15);
+                rectMode(CENTER);
+            }
+
             fill(0); noStroke(); textSize(min(24, boxW * 0.18)); textAlign(CENTER, CENTER);
             text(currentChoices[i].word.toUpperCase(), cx, cy);
             rectMode(CORNER);
