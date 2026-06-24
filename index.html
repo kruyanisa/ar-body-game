@@ -53,9 +53,8 @@
             for (let j = 0; j < pose.keypoints.length; j++) {
                 let keypoint = pose.keypoints[j];
                 
-                // ถ้าระบบมั่นใจว่าเจอจุดนี้เกิน 20%
                 if (keypoint.score > 0.2) {
-                    let x = width - keypoint.position.x; // ปรับแกน X เพราะเรากลับด้านกระจก
+                    let x = width - keypoint.position.x; 
                     let y = keypoint.position.y;
 
                     // วาดจุดสีส้ม
@@ -63,12 +62,22 @@
                     noStroke();
                     ellipse(x, y, 15, 15);
                     
-                    // แปะคำศัพท์
+                    // ตั้งค่าฟอนต์
                     fill(255);
                     stroke(0);
                     strokeWeight(3);
                     textSize(20);
-                    text(keypoint.part, x + 15, y + 5);
+                    
+                    // เช็คตำแหน่งเพื่อสลับฝั่งตัวหนังสือ
+                    if (x < width / 2) {
+                        // ถ้าจุดอยู่ซ้ายจอ -> ตัวหนังสืออยู่ขวามือของปุ่ม
+                        textAlign(LEFT, CENTER);
+                        text(keypoint.part, x + 15, y);
+                    } else {
+                        // ถ้าจุดอยู่ขวาจอ -> ตัวหนังสืออยู่ซ้ายมือของปุ่ม
+                        textAlign(RIGHT, CENTER);
+                        text(keypoint.part, x - 15, y);
+                    }
                 }
             }
         }
