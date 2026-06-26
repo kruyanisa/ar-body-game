@@ -109,7 +109,8 @@
         
         if (isNoCameraMode) {
             if (video) video.hide();
-            // หยุด PoseNet ชั่วคราวเมื่อไม่ใช้กล้อง
+        } else {
+            if (video) video.show();
         }
     }
 
@@ -131,25 +132,16 @@
         questionStartTime = millis() + 500;
     }
 
+    // แก้การคลิกหน้าเมนูให้ง่ายขึ้น: แบ่งครึ่งจอซ้ายขวาไปเลย
     function mousePressedOnMenu(x, y) {
-        let boxW = min(300, width * 0.4);
-        let boxH = 150;
-        
-        let leftBtnX = width/2 - boxW/2 - 20;
-        let rightBtnX = width/2 + boxW/2 + 20;
-        let btnY = height/2 + 50;
-
-        // เช็คคลิกปุ่มซ้าย
-        if (x > leftBtnX - boxW/2 && x < leftBtnX + boxW/2 && y > btnY - boxH/2 && y < btnY + boxH/2) {
-            isNoCameraMode = false;
-            startCountdown();
-            return;
-        }
-        // เช็คคลิกปุ่มขวา
-        if (x > rightBtnX - boxW/2 && x < rightBtnX + boxW/2 && y > btnY - boxH/2 && y < btnY + boxH/2) {
-            isNoCameraMode = true;
-            startCountdown();
-            return;
+        if (y > height * 0.3) { // ถือว่ากดต่ำกว่าข้อความหัวเรื่องลงมา
+            if (x < width / 2) {
+                isNoCameraMode = false; // ฝั่งซ้าย
+                startCountdown();
+            } else {
+                isNoCameraMode = true; // ฝั่งขวา
+                startCountdown();
+            }
         }
     }
 
@@ -157,8 +149,12 @@
         if (event && event.target && event.target.tagName === 'BUTTON') return; 
         userStartAudio(); 
         
+        // รองรับระบบ Touch บนมือถือให้แม่นยำขึ้น
+        let cx = (touches.length > 0) ? touches[0].x : mouseX;
+        let cy = (touches.length > 0) ? touches[0].y : mouseY;
+
         if (state === 'START_MENU') {
-            mousePressedOnMenu(mouseX, mouseY);
+            mousePressedOnMenu(cx, cy);
             document.getElementById('bgMusic').play().catch(e => console.log(e));
         } else if (state === 'END') { 
             restartGame();
@@ -233,13 +229,11 @@
 
         rectMode(CENTER); noStroke();
 
-        // ปุ่มซ้าย: เปิดกล้อง
         fill(16, 185, 129, 200); 
         rect(leftBtnX, btnY, boxW, boxH, 15);
         fill(255); textSize(24); text('เล่นแบบเปิดกล้อง', leftBtnX, btnY - 15);
         textSize(16); textStyle(NORMAL); text('(ขยับร่างกายตอบ)', leftBtnX, btnY + 25);
 
-        // ปุ่มขวา: ไม่เปิดกล้อง
         textStyle(BOLD);
         fill(59, 130, 246, 200); 
         rect(rightBtnX, btnY, boxW, boxH, 15);
@@ -305,8 +299,13 @@
         }
 
         if (active) {
-            smoothedSensorPos[0] = lerp(smoothedSensorPos[0], sensorPos[0], 0.3);
-            smoothedSensorPos[1] = lerp(smoothedSensorPos[1], sensorPos[1], 0.3);
+            if (isNoCameraMode) {
+                smoothedSensorPos[0] = sensorPos[0];
+                smoothedSensorPos[1] = sensorPos[1];
+            } else {
+                smoothedSensorPos[0] = lerp(smoothedSensorPos[0], sensorPos[0], 0.3);
+                smoothedSensorPos[1] = lerp(smoothedSensorPos[1], sensorPos[1], 0.3);
+            }
 
             if (millis() < questionStartTime) return;
 
