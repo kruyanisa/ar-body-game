@@ -30,7 +30,7 @@
 
 <script>
     let video, poseNet, poses = [];
-    let state = 'START'; 
+    let state = 'START_MENU'; // เพิ่มสถานะหน้าเมนูหลัก
     let score = 0, currentQuestion = 0, maxQuestions = 10;
     let targetWord = null, timeLeft = 8000, lastTime = 0;
     let currentChoices = [];
@@ -50,6 +50,9 @@
     
     // เพิ่มตัวแปรหน่วงเวลาตอนเริ่มข้อใหม่ ป้องกันการลั่น
     let questionStartTime = 0; 
+    
+    // ตัวแปรเก็บสถานะการเล่นโหมดไม่มีกล้อง
+    let isNoCameraMode = false;
 
     const vocabList = [
         { word: 'body' }, { word: 'head' }, { word: 'hair' }, { word: 'face' },
@@ -72,6 +75,7 @@
         cnv.parent('game-container');
         cnv.style('touch-action', 'none'); 
 
+        // เริ่มต้นกล้องและ PoseNet (จะถูกปิดถ้าเลือก NoCameraMode)
         video = createCapture(VIDEO);
         video.size(windowWidth, windowHeight);
         poseNet = ml5.poseNet(video, () => console.log('Model Loaded'));
@@ -83,6 +87,7 @@
         osc.start();
         osc.amp(env);
         
+        // กำหนดตำแหน่งเริ่มต้นเซ็นเซอร์ให้อยู่ใต้จอ
         smoothedSensorPos = [width / 2, height + 200];
     }
 
@@ -108,6 +113,12 @@
         countdownNum = 3;
         countdownTimer = millis() + 1000;
         smoothedSensorPos = [width / 2, height + 200]; // รีเซ็ตตำแหน่งมือไปใต้จอ
+        
+        // ถ้าเป็นโหมดไม่มีกล้อง จะซ่อนวิดีโอและหยุด AI เพื่อประหยัดทรัพยากร
+        if (isNoCameraMode) {
+            if (video) video.hide();
+            if (poseNet) poseNet.stop();
+        }
     }
 
     function nextQuestion() {
@@ -130,12 +141,28 @@
         questionStartTime = millis() + 500;
     }
 
+    // ฟังก์ชันจัดการคลิกบนหน้าเมนู
+    function mousePressedOnMenu(x, y) {
+        // ตรวจสอบคลิกปุ่ม "เปิดกล้อง" (ใช้อัตราส่วนจอ)
+        if (x > width * 0.2 && x < width * 0.45 && y > height * 0.45 && y < height * 0.7) {
+            isNoCameraMode = false;
+            startCountdown();
+            return;
+        }
+        // ตรวจสอบคลิกปุ่ม "ไม่เปิดกล้อง"
+        if (x > width * 0.55 && x < width * 0.8 && y > height * 0.45 && y < height * 0.7) {
+            isNoCameraMode = true;
+            startCountdown();
+            return;
+        }
+    }
+
     function mousePressed(event) {
         if (event && event.target && event.target.tagName === 'BUTTON') return; 
         userStartAudio(); 
-        if (state === 'START') { 
-            sessionVocab = shuffle([...vocabList]).slice(0, maxQuestions);
-            startCountdown();
+        
+        if (state === 'START_MENU') {
+            mousePressedOnMenu(mouseX, mouseY);
             document.getElementById('bgMusic').play().catch(e => console.log(e));
         } else if (state === 'END') { 
             restartGame();
@@ -155,6 +182,13 @@
         isFeedbackState = false;
         sessionVocab = shuffle([...vocabList]).slice(0, maxQuestions);
         document.getElementById('bgMusic').currentTime = 0;
+        
+        // รีเซ็ต AI และวิดีโอ (ถ้าเป็นโหมดไม่มีกล้อง)
+        if (isNoCameraMode && poseNet) {
+            poseNet.start(); // สตาร์ท AI ชั่วคราวเพื่อให้รีโหลดสถานะ
+            if (video) video.show();
+        }
+        
         document.getElementById('bgMusic').play().catch(e => console.log(e));
         startCountdown();
     }
@@ -165,7 +199,8 @@
     }
 
     function draw() {
-        if (state === 'END') {
+        // ดับจอกล้องถ้าจบเกมหรือเลือกโหมดไม่มีกล้อง
+        if (state === 'END' || (state !== 'START_MENU' && state !== 'COUNTDOWN' && isNoCameraMode)) {
             background('#1e293b');
         } else {
             push(); translate(width, 0); scale(-1, 1); image(video, 0, 0, width, height); pop();
@@ -173,8 +208,8 @@
         
         fill(0, 0, 0, 150); rect(0, 0, width, height); 
 
-        if (state === 'START') {
-            drawUI('Touch to Start', 'แตะหน้าจอเพื่อเริ่มเกม!', 40, width/2, height/2);
+        if (state === 'START_MENU') {
+            drawStartMenuUI();
         } else if (state === 'COUNTDOWN') {
             runCountdownLogic();
             drawCountdownUI();
@@ -185,6 +220,35 @@
             drawUI('GAME OVER', `Score: ${score}/${maxQuestions}\nTap to Try Again`, 50, width/2, height/2, score >= 5 ? '#10b981' : '#ef4444');
             if (score >= maxQuestions / 2) runFireworks();
         }
+    }
+
+    // วาดหน้าเมนูหลักแยกโหมด
+    function drawStartMenuUI() {
+        textAlign(CENTER, CENTER);
+        textStyle(BOLD);
+        
+        fill('#38bdf8'); textSize(50);
+        text('My Body AR Game', width/2, height/2 - 120);
+        
+        fill(255); textSize(24);
+        text('กรุณาเลือกโหมดการเล่น (Select Game Mode)', width/2, height/2 - 60);
+
+        let boxW = width * 0.25, boxH = height * 0.25;
+        rectMode(CENTER); textStyle(BOLD); noStroke();
+
+        // ปุ่มซ้าย: เปิดกล้อง
+        fill('#10b981', 180); rect(width * 0.325, height * 0.575, boxW, boxH, 15);
+        fill(255); textSize(32); text('🎥', width * 0.325, height * 0.55);
+        textSize(24); text('เล่นแบบเปิดกล้อง', width * 0.325, height * 0.6);
+        textSize(16); textStyle(NORMAL); text('(ใช้การเคลื่อนไหว)', width * 0.325, height * 0.65);
+
+        // ปุ่มขวา: ไม่เปิดกล้อง
+        fill('#3b82f6', 180); rect(width * 0.675, height * 0.575, boxW, boxH, 15);
+        fill(255); textStyle(BOLD); textSize(32); text('👆', width * 0.675, height * 0.55);
+        textSize(24); text('เล่นแบบปิดกล้อง', width * 0.675, height * 0.6);
+        textSize(16); textStyle(NORMAL); text('(ใช้นิ้วจิ้ม/เมาส์คลิก)', width * 0.675, height * 0.65);
+        
+        rectMode(CORNER); textStyle(NORMAL); // รีเซ็ตสถานะ
     }
 
     function runCountdownLogic() {
@@ -223,10 +287,20 @@
         let active = false;
         let sensorPos = [0, 0];
 
-        if (poses.length > 0) {
-            let pose = poses[0].pose;
-            let lw = pose.leftWrist;
-            let rw = pose.rightWrist;
+        // จัดการตรวจจับสัมผัส (ต่างกันในแต่ละโหมด)
+        if (isNoCameraMode) {
+            // โหมดไม่มีกล้อง: ตรวจสอบสัมผัสจอหรือคลิกเมาส์โดยตรง
+            if (touches.length > 0) {
+                sensorPos = [touches[0].x, touches[0].y];
+                active = true;
+            } else if (mouseIsPressed) {
+                sensorPos = [mouseX, mouseY];
+                active = true;
+            }
+        } else if (poses.length > 0) {
+            // โหมดมีกล้อง: ตรวจสอบผ่าน AI PoseNet
+            let lw = poses[0].pose.leftWrist;
+            let rw = poses[0].pose.rightWrist;
             
             if (lw.confidence > 0.4 || rw.confidence > 0.4) {
                 let activeWrist = (lw.confidence > rw.confidence) ? lw : rw;
@@ -266,6 +340,7 @@
     }
 
     function drawGameUI() {
+        // ขยับพิกัดตัวอักษรลงมาที่ระยะ Y = 90 เพื่อไม่ให้ปุ่ม HTML ทับข้อความตัวเลข
         fill(255); textAlign(LEFT, TOP); textSize(24); textStyle(BOLD); text(`Score: ${score}`, 20, 90); 
         textAlign(RIGHT, TOP); text(`${currentQuestion} / ${maxQuestions}`, width - 20, 90);
         
@@ -290,6 +365,7 @@
         let gap = (availableWidth - (boxW * 3)) / 2; 
         let startX = screenPadding; 
 
+        // ขยับกลุ่มปุ่มลงมาเล็กน้อยที่ Y = 160 เพื่อความสมดุลและสวยงาม
         for (let i = 0; i < 3; i++) {
             let cx = startX + i * (boxW + gap) + boxW / 2;
             let cy = 160; 
