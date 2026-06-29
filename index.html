@@ -39,9 +39,8 @@
     let sessionVocab = []; 
     let vocabImages = {}; 
     
-    // ตัวแปรสำหรับรูปภาพพื้นหลัง
-    let bgMenuImage;   // พื้นหลังหน้าแรก
-    let bgNormalImage; // พื้นหลังโหมดปกติ (RPG)
+    let bgMenuImage;   
+    let bgNormalImage; 
     
     let smoothedSensorPos = [320, 1000]; 
     
@@ -69,7 +68,6 @@
         vocabList.forEach(v => {
             vocabImages[v.word] = loadImage(v.word + '.png');
         });
-        // โหลดรูปภาพพื้นหลัง 2 รูป (เตรียมไว้ใน GitHub ได้เลย)
         bgMenuImage = loadImage('bg_menu.jpg'); 
         bgNormalImage = loadImage('bg_normal.jpg'); 
     }
@@ -108,7 +106,9 @@
     }
 
     function playSound(type) {
-        if (type === 'correct') {
+        if (type === 'click') {
+            osc.setType('triangle'); osc.freq(587.33); env.play(osc, 0, 0.05, 0.1, 0.05, 0); // เสียงปุ่มเมนู
+        } else if (type === 'correct') {
             osc.setType('sine'); osc.freq(880); env.play(osc, 0, 0.1, 0.1, 0.1, 0);
         } else if (type === 'wrong') {
             osc.setType('sawtooth'); osc.freq(150); env.play(osc, 0, 0.1, 0.3, 0.1, 0);
@@ -120,6 +120,11 @@
     }
 
     function startCountdown() {
+        // บั๊กแก้ไขตรงนี้: สุ่มสร้างคลังคำศัพท์ประจำรอบทิ้งไว้ตั้งแต่เริ่มระบบตัวนับถอยหลัง
+        sessionVocab = shuffle([...vocabList]).slice(0, maxQuestions); 
+        currentQuestion = 0;
+        score = 0;
+        
         state = 'COUNTDOWN';
         countdownNum = 3;
         countdownTimer = millis() + 1000;
@@ -150,8 +155,10 @@
     function mousePressedOnMenu(x, y) {
         if (y > height * 0.3) { 
             if (x < width / 2) {
+                playSound('click');
                 initCameraAndStart();
             } else {
+                playSound('click');
                 isNoCameraMode = true;
                 startCountdown();
             }
@@ -184,7 +191,6 @@
         score = 0; currentQuestion = 0; fireworks = []; 
         smoothedSensorPos = [width / 2, height + 200];
         isFeedbackState = false;
-        sessionVocab = shuffle([...vocabList]).slice(0, maxQuestions);
         document.getElementById('bgMusic').currentTime = 0;
         document.getElementById('bgMusic').play().catch(e => console.log(e));
         
@@ -197,7 +203,6 @@
     }
 
     function draw() {
-        // --- ระบบสลับพื้นหลังสุดล้ำ ---
         if (state === 'START_MENU' || state === 'LOADING_CAMERA') {
             if (bgMenuImage && bgMenuImage.width > 0) {
                 image(bgMenuImage, 0, 0, width, height);
@@ -208,20 +213,17 @@
         } else if (state === 'END') {
             background('#1e293b');
         } else if (isNoCameraMode) {
-            // โหมดปกติ (ไม่ใช้กล้อง) -> ดึงภาพ bg_normal.jpg มาแสดง
             if (bgNormalImage && bgNormalImage.width > 0) {
                 image(bgNormalImage, 0, 0, width, height);
-                fill(0, 0, 0, 80); rect(0, 0, width, height); // ฟิลเตอร์บางๆ ให้ปุ่มและหนังสือยังอ่านออก
+                fill(0, 0, 0, 80); rect(0, 0, width, height); 
             } else {
-                background('#1e293b'); // ถ้ายังไม่มีรูป ให้ใช้สีเทามืดแทน
+                background('#1e293b'); 
             }
         } else if (video) {
-            // โหมด AR (ใช้กล้อง) -> ดึงภาพกล้องวิดีโอมาแสดง
             push(); translate(width, 0); scale(-1, 1); image(video, 0, 0, width, height); pop();
             fill(0, 0, 0, 150); rect(0, 0, width, height); 
         }
 
-        // --- วาด UI ซ้อนทับฉากหลัง ---
         if (state === 'START_MENU') {
             drawStartMenuUI();
         } else if (state === 'LOADING_CAMERA') {
@@ -261,18 +263,32 @@
         let rightBtnX = width/2 + boxW/2 + 20;
         let btnY = height/2 + 50;
 
+        // เช็คการ Hover ของเมาส์
+        let hoverLeft = (mouseX > leftBtnX - boxW/2 && mouseX < leftBtnX + boxW/2 && mouseY > btnY - boxH/2 && mouseY < btnY + boxH/2);
+        let hoverRight = (mouseX > rightBtnX - boxW/2 && mouseX < rightBtnX + boxW/2 && mouseY > btnY - boxH/2 && mouseY < btnY + boxH/2);
+
         rectMode(CENTER); noStroke();
 
-        fill(16, 185, 129, 220); 
-        rect(leftBtnX, btnY, boxW, boxH, 15);
-        fill(255); textSize(24); text('เล่นแบบเปิดกล้อง', leftBtnX, btnY - 15);
-        textSize(16); textStyle(NORMAL); text('(ขยับร่างกายตอบ)', leftBtnX, btnY + 25);
+        // --- ปุ่มซ้าย 3D ภาพนูน (โหมดเปิดกล้อง) ---
+        fill(10, 110, 65); rect(leftBtnX, btnY + 10, boxW, boxH, 20); // ฐานเงา
+        if (hoverLeft) {
+            fill(25, 215, 150); rect(leftBtnX, btnY + 4, boxW, boxH, 20); // ตัวปุ่มยุบลงเมื่อชี้
+        } else {
+            fill(16, 185, 129); rect(leftBtnX, btnY, boxW, boxH, 20); // ตัวปุ่มปกติ
+        }
+        fill(255); textSize(24); text('เล่นแบบเปิดกล้อง', leftBtnX, btnY - 15 + (hoverLeft ? 4 : 0));
+        textSize(16); textStyle(NORMAL); text('(ขยับร่างกายตอบ)', leftBtnX, btnY + 25 + (hoverLeft ? 4 : 0));
 
+        // --- ปุ่มขวา 3D ภาพนูน (โหมดปิดกล้อง) ---
         textStyle(BOLD);
-        fill(59, 130, 246, 220); 
-        rect(rightBtnX, btnY, boxW, boxH, 15);
-        fill(255); textSize(24); text('เล่นแบบปิดกล้อง', rightBtnX, btnY - 15);
-        textSize(16); textStyle(NORMAL); text('(ใช้นิ้วจิ้ม/เมาส์คลิก)', rightBtnX, btnY + 25);
+        fill(25, 75, 170); rect(rightBtnX, btnY + 10, boxW, boxH, 20); // ฐานเงา
+        if (hoverRight) {
+            fill(80, 165, 255); rect(rightBtnX, btnY + 4, boxW, boxH, 20); // ตัวปุ่มยุบลงเมื่อชี้
+        } else {
+            fill(59, 130, 246); rect(rightBtnX, btnY, boxW, boxH, 20); // ตัวปุ่มปกติ
+        }
+        fill(255); textSize(24); text('เล่นแบบปิดกล้อง', rightBtnX, btnY - 15 + (hoverRight ? 4 : 0));
+        textSize(16); textStyle(NORMAL); text('(ใช้นิ้วจิ้ม/เมาส์คลิก)', rightBtnX, btnY + 25 + (hoverRight ? 4 : 0));
         
         rectMode(CORNER); 
     }
