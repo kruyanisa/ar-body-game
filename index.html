@@ -107,7 +107,7 @@
 
     function playSound(type) {
         if (type === 'click') {
-            osc.setType('triangle'); osc.freq(587.33); env.play(osc, 0, 0.05, 0.1, 0.05, 0); // เสียงปุ่มเมนู
+            osc.setType('triangle'); osc.freq(587.33); env.play(osc, 0, 0.05, 0.1, 0.05, 0);
         } else if (type === 'correct') {
             osc.setType('sine'); osc.freq(880); env.play(osc, 0, 0.1, 0.1, 0.1, 0);
         } else if (type === 'wrong') {
@@ -120,7 +120,6 @@
     }
 
     function startCountdown() {
-        // บั๊กแก้ไขตรงนี้: สุ่มสร้างคลังคำศัพท์ประจำรอบทิ้งไว้ตั้งแต่เริ่มระบบตัวนับถอยหลัง
         sessionVocab = shuffle([...vocabList]).slice(0, maxQuestions); 
         currentQuestion = 0;
         score = 0;
@@ -235,7 +234,8 @@
             runGameLogic();
             drawGameUI();
         } else if (state === 'END') {
-            drawUI('GAME OVER', `Score: ${score}/${maxQuestions}\nTap to Try Again`, 50, width/2, height/2, score >= 5 ? '#10b981' : '#ef4444');
+            // แก้คำจบเกมเป็น Result!
+            drawUI('Result!', `Quiz Completed!\nScore: ${score}/${maxQuestions}\nTap to Try Again`, 50, width/2, height/2, score >= 5 ? '#10b981' : '#ef4444');
             if (score >= maxQuestions / 2) runFireworks();
         }
     }
@@ -263,29 +263,26 @@
         let rightBtnX = width/2 + boxW/2 + 20;
         let btnY = height/2 + 50;
 
-        // เช็คการ Hover ของเมาส์
         let hoverLeft = (mouseX > leftBtnX - boxW/2 && mouseX < leftBtnX + boxW/2 && mouseY > btnY - boxH/2 && mouseY < btnY + boxH/2);
         let hoverRight = (mouseX > rightBtnX - boxW/2 && mouseX < rightBtnX + boxW/2 && mouseY > btnY - boxH/2 && mouseY < btnY + boxH/2);
 
         rectMode(CENTER); noStroke();
 
-        // --- ปุ่มซ้าย 3D ภาพนูน (โหมดเปิดกล้อง) ---
-        fill(10, 110, 65); rect(leftBtnX, btnY + 10, boxW, boxH, 20); // ฐานเงา
+        fill(10, 110, 65); rect(leftBtnX, btnY + 10, boxW, boxH, 20); 
         if (hoverLeft) {
-            fill(25, 215, 150); rect(leftBtnX, btnY + 4, boxW, boxH, 20); // ตัวปุ่มยุบลงเมื่อชี้
+            fill(25, 215, 150); rect(leftBtnX, btnY + 4, boxW, boxH, 20); 
         } else {
-            fill(16, 185, 129); rect(leftBtnX, btnY, boxW, boxH, 20); // ตัวปุ่มปกติ
+            fill(16, 185, 129); rect(leftBtnX, btnY, boxW, boxH, 20); 
         }
         fill(255); textSize(24); text('เล่นแบบเปิดกล้อง', leftBtnX, btnY - 15 + (hoverLeft ? 4 : 0));
         textSize(16); textStyle(NORMAL); text('(ขยับร่างกายตอบ)', leftBtnX, btnY + 25 + (hoverLeft ? 4 : 0));
 
-        // --- ปุ่มขวา 3D ภาพนูน (โหมดปิดกล้อง) ---
         textStyle(BOLD);
-        fill(25, 75, 170); rect(rightBtnX, btnY + 10, boxW, boxH, 20); // ฐานเงา
+        fill(25, 75, 170); rect(rightBtnX, btnY + 10, boxW, boxH, 20); 
         if (hoverRight) {
-            fill(80, 165, 255); rect(rightBtnX, btnY + 4, boxW, boxH, 20); // ตัวปุ่มยุบลงเมื่อชี้
+            fill(80, 165, 255); rect(rightBtnX, btnY + 4, boxW, boxH, 20); 
         } else {
-            fill(59, 130, 246); rect(rightBtnX, btnY, boxW, boxH, 20); // ตัวปุ่มปกติ
+            fill(59, 130, 246); rect(rightBtnX, btnY, boxW, boxH, 20); 
         }
         fill(255); textSize(24); text('เล่นแบบปิดกล้อง', rightBtnX, btnY - 15 + (hoverRight ? 4 : 0));
         textSize(16); textStyle(NORMAL); text('(ใช้นิ้วจิ้ม/เมาส์คลิก)', rightBtnX, btnY + 25 + (hoverRight ? 4 : 0));
@@ -343,7 +340,9 @@
             
             if (lw.confidence > 0.4 || rw.confidence > 0.4) {
                 let activeWrist = (lw.confidence > rw.confidence) ? lw : rw;
-                sensorPos = [width - activeWrist.x, activeWrist.y - 80]; 
+                
+                // ปรับตำแหน่งให้เลยข้อมือขึ้นไปที่ "ปลายนิ้ว" ประมาณ 150 pixel
+                sensorPos = [width - activeWrist.x, activeWrist.y - 150]; 
                 active = true;
             }
         }
@@ -411,19 +410,28 @@
             let cx = startX + i * (boxW + gap) + boxW / 2;
             let cy = 160; 
             
+            // ขยายขอบเขต Hitbox กว้างกว่าตัวปุ่มเล็กน้อย เพื่อให้สัมผัสง่ายขึ้น
             currentChoices[i].cx = cx; 
             currentChoices[i].cy = cy;
-            currentChoices[i].hitW = boxW / 2 + 15; 
-            currentChoices[i].hitH = boxH / 2 + 15;
+            currentChoices[i].hitW = boxW / 2 + 30; 
+            currentChoices[i].hitH = boxH / 2 + 30;
 
             rectMode(CENTER); 
             
+            // วาดกรอบ Hitbox สีเขียวประให้เห็นภาพการตรวจจับชัดเจน (Debugging Box)
+            push();
+            stroke(0, 255, 0, 150); 
+            strokeWeight(2);
+            drawingContext.setLineDash([5, 5]); // สร้างเส้นประ
+            noFill();
+            rect(cx, cy, currentChoices[i].hitW * 2, currentChoices[i].hitH * 2, 20);
+            drawingContext.setLineDash([]); // รีเซ็ต
+            pop();
+
+            // วาดตัวปุ่มคำตอบ
             if (isFeedbackState && i === selectedButtonIndex) {
-                if (isCorrectAnswer) {
-                    fill(46, 204, 113); 
-                } else {
-                    fill(231, 76, 60); 
-                }
+                if (isCorrectAnswer) fill(46, 204, 113); 
+                else fill(231, 76, 60); 
             } else {
                 fill(255, 255, 255, 240); 
             }
@@ -437,6 +445,21 @@
             noStroke(); textSize(min(24, boxW * 0.18)); textAlign(CENTER, CENTER);
             text(currentChoices[i].word.toUpperCase(), cx, cy);
             rectMode(CORNER);
+        }
+
+        // วาดเป้าเล็ง (Crosshair) แสดงจุดที่เซ็นเซอร์ตรวจจับได้ (เฉพาะโหมดมีกล้อง)
+        if (!isNoCameraMode && smoothedSensorPos[1] < height) {
+            push();
+            let px = smoothedSensorPos[0];
+            let py = smoothedSensorPos[1];
+            
+            fill(255, 50, 50, 200); noStroke();
+            circle(px, py, 15); // จุดศูนย์กลาง
+            
+            stroke(255, 50, 50, 200); strokeWeight(3);
+            line(px - 20, py, px + 20, py); // เส้นแนวนอน
+            line(px, py - 20, px, py + 20); // เส้นแนวตั้ง
+            pop();
         }
     }
 
