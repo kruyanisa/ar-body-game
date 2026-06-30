@@ -22,9 +22,7 @@
         /* ส่วนแสดงชื่อผู้เล่นด้านบนจอ */
         .header-container { position: absolute; top: 20px; left: 140px; z-index: 10; font-family: 'Sarabun'; }
         .welcome-text { font-size: 14px; font-weight: bold; color: #3730a3; background: #e0e7ff; padding: 6px 15px; border-radius: 50px; border: 1px solid #c7d2fe; display: flex; align-items: center; gap: 10px; }
-        
-        /* ปุ่มสลับบัญชี/เปลี่ยนชื่อ */
-        .logout-btn { cursor: pointer; border: none; background: #ef4444; color: white; border-radius: 5px; padding: 3px 10px; font-size: 13px; transition: 0.2s; font-family: 'Sarabun'; }
+        .logout-btn { cursor: pointer; border: none; background: #ef4444; color: white; border-radius: 5px; padding: 2px 8px; font-size: 12px; transition: 0.2s; font-family: 'Sarabun'; }
         .logout-btn:hover { background: #b91c1c; }
 
         /* CSS ระบบการส่งคะแนนและ Modal ส่วนเสริม */
@@ -32,11 +30,8 @@
         .modal-box-login { background: white; padding: 30px; border-radius: 20px; width: 85%; max-width: 350px; box-shadow: 0 15px 30px rgba(0,0,0,0.3); border: 3px solid #6366f1; text-align: center; }
         .modal-box-login h2 { margin-top: 0; color: #4f46e5; font-family: 'Sarabun'; font-size: 24px; }
         .modal-box-login p { color: #64748b; font-size: 14px; margin-bottom: 20px; }
-        
-        /* แก้ไขบั๊ก Input สีดำ ให้เป็นสีขาวเสมอ */
         .modal-box-login input { width: 100%; padding: 12px; margin-bottom: 15px; border: 2px solid #cbd5e1; border-radius: 10px; font-size: 16px; text-align: center; box-sizing: border-box; font-family: 'Sarabun'; transition: 0.2s; background-color: #ffffff; color: #1e293b; }
         .modal-box-login input:focus { border-color: #6366f1; outline: none; }
-        
         .modal-box-login button { width: 100%; padding: 12px; background: #6366f1; color: white; border: none; border-radius: 10px; font-size: 18px; font-weight: bold; font-family: 'Sarabun'; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 0 #4338ca; }
         .modal-box-login button:hover { background: #4f46e5; transform: translateY(-2px); }
 
@@ -56,10 +51,7 @@
     <div id="game-container">
         <div class="header-container">
             <div id="welcome-section" style="display: none;">
-                <div class="welcome-text">
-                    👤 <span id="show_name"></span> | 🏫 <span id="show_room"></span> | 🆔 <span id="show_id"></span>
-                    <button class="logout-btn" onclick="logoutUser()">สลับชื่อ/เลื่อนชั้น</button>
-                </div>
+                <div class="welcome-text">👤 ผู้เล่น: <span id="show_name"></span> | 🏫 ห้อง: <span id="show_room"></span> | 🆔 รหัส: <span id="show_id"></span> <button class="logout-btn" onclick="logoutUser()">สลับบัญชี</button></div>
             </div>
         </div>
 
@@ -90,6 +82,7 @@
             </div>
             <div id="saveStatus" class="saving-text">⏳ กำลังบันทึกคะแนน...</div>
             <button class="modal-btn" id="playAgainBtn" onclick="closeScoreModalAndRestart()" style="display:none;">🚀 เล่นอีกครั้ง</button>
+            <button class="modal-btn" id="mainMenuBtn" onclick="goToMainMenu()" style="display:none; background: #64748b; box-shadow: 0 4px 0 #475569; margin-top: 10px;">🏠 จบเกม / กลับหน้าหลัก</button>
         </div>
     </div>
 
@@ -102,7 +95,7 @@
     let video = null;
     let poseNet = null;
     let poses = [];
-    let state = 'START_MENU'; 
+    let state = 'START_MENU';
     let score = 0, currentQuestion = 0, maxQuestions = 10;
     let targetWord = null, timeLeft = 8000, lastTime = 0;
     let currentChoices = [];
@@ -110,7 +103,7 @@
     let vocabImages = {}; 
     
     let bgMenuImage;   
-    let bgNormalImage; 
+    let bgNormalImage;
     let smoothedSensorPos = [320, 1000]; 
     
     let isFeedbackState = false;
@@ -122,7 +115,6 @@
     let countdownTimer = 0;
     let questionStartTime = 0; 
     let isNoCameraMode = false;
-
     const vocabList = [
         { word: 'body' }, { word: 'head' }, { word: 'hair' }, { word: 'face' },
         { word: 'eye' }, { word: 'ear' }, { word: 'nose' }, { word: 'mouth' },
@@ -130,7 +122,6 @@
         { word: 'shoulders' }, { word: 'arm' }, { word: 'hand' }, { word: 'hips' },
         { word: 'leg' }, { word: 'knees' }, { word: 'feet' }
     ];
-
     let osc, env, fireworks = [];
 
     // เรียกโหลดความจำเก่าของนักเรียนตั้งแต่เปิดหน้าเว็บขึ้นมา
@@ -152,10 +143,9 @@
         });
     };
 
-    // ฟังก์ชันเคลียร์ชื่อผู้เล่น
+    // ฟังก์ชันสำหรับปุ่มสลับบัญชีผู้ใช้
     function logoutUser() {
         let confirmLogout = confirm("ต้องการเปลี่ยนชื่อผู้เล่นใช่ไหมครับ?\n\nระบบจะลบข้อมูลเดิมออก และระบบจะให้กรอกชื่อใหม่หลังเล่นจบครับ");
-        
         if (confirmLogout) {
             localStorage.removeItem('studentName');
             localStorage.removeItem('studentRoom');
@@ -193,7 +183,6 @@
         env = new p5.Envelope();
         osc.start();
         osc.amp(env);
-        
         smoothedSensorPos = [width / 2, height + 200];
     }
 
@@ -219,11 +208,14 @@
 
     function playSound(type) {
         if (type === 'click') {
-            osc.setType('triangle'); osc.freq(587.33); env.play(osc, 0, 0.05, 0.1, 0.05, 0);
+            osc.setType('triangle');
+            osc.freq(587.33); env.play(osc, 0, 0.05, 0.1, 0.05, 0);
         } else if (type === 'correct') {
-            osc.setType('sine'); osc.freq(880); env.play(osc, 0, 0.1, 0.1, 0.1, 0);
+            osc.setType('sine');
+            osc.freq(880); env.play(osc, 0, 0.1, 0.1, 0.1, 0);
         } else if (type === 'wrong') {
-            osc.setType('sawtooth'); osc.freq(150); env.play(osc, 0, 0.1, 0.3, 0.1, 0);
+            osc.setType('sawtooth');
+            osc.freq(150); env.play(osc, 0, 0.1, 0.3, 0.1, 0);
         } else if (type === 'win') {
             osc.setType('triangle');
             setTimeout(() => { osc.freq(523.25); env.play(osc, 0, 0.1, 0.1, 0.1, 0); }, 0);
@@ -232,7 +224,7 @@
     }
 
     function startCountdown() {
-        sessionVocab = shuffle([...vocabList]).slice(0, maxQuestions); 
+        sessionVocab = shuffle([...vocabList]).slice(0, maxQuestions);
         currentQuestion = 0;
         score = 0;
         
@@ -289,7 +281,7 @@
 
     function mousePressed(event) {
         // บล็อกไม่ให้ P5 ตรวจจับการคลิกทะลุลงไปโดนปุ่ม HTML ของระบบส่งคะแนน
-        if (event && event.target && (event.target.tagName === 'BUTTON' || event.target.tagName === 'INPUT')) return; 
+        if (event && event.target && (event.target.tagName === 'BUTTON' || event.target.tagName === 'INPUT')) return;
         userStartAudio(); 
         
         let cx = (touches.length > 0) ? touches[0].x : mouseX;
@@ -310,11 +302,9 @@
         let r = document.getElementById('m_room').value.trim();
         let i = document.getElementById('m_id').value.trim();
         let err = document.getElementById('modal-err');
-
         // รันฟอร์แมตห้องซ้ำอีกรอบเพื่อความชัวร์ 100% ก่อนส่งข้อมูลลงระบบ
         r = autoFormatRoom(r);
         document.getElementById('m_room').value = r;
-
         if(!n || !r || i.length !== 5) {
             err.innerText = "กรุณากรอกข้อมูลให้ครบ และรหัสต้องมี 5 หลักครับ!";
             err.style.display = 'block';
@@ -342,12 +332,13 @@
     async function submitGameScore() {
         let stat = document.getElementById('saveStatus');
         let playBtn = document.getElementById('playAgainBtn');
+        let menuBtn = document.getElementById('mainMenuBtn');
         
         stat.style.display = 'block';
         stat.innerText = "⏳ กำลังบันทึกคะแนน...";
         stat.style.color = "#4f46e5";
         playBtn.style.display = 'none';
-
+        menuBtn.style.display = 'none';
         const payload = { 
             name: studentData.name, 
             room: studentData.room, 
@@ -357,7 +348,6 @@
             maxScore: maxQuestions,
             _t: new Date().getTime() 
         };
-
         try {
             await fetch(SCRIPT_URL, {
                 method: 'POST', mode: 'no-cors', cache: 'no-store',
@@ -371,6 +361,7 @@
             stat.style.color = '#ef4444';
         } finally {
             playBtn.style.display = 'inline-block';
+            menuBtn.style.display = 'inline-block';
         }
     }
 
@@ -380,15 +371,30 @@
         restartGame();
     }
 
+    // ฟังก์ชันพาผู้เล่นกลับหน้าเมนูหลักอย่างปลอดภัย ไม่เกิดการส่งคะแนนซ้ำ
+    function goToMainMenu() {
+        document.getElementById('scoreModal').classList.remove('active');
+        document.getElementById('saveStatus').style.display = 'none';
+        state = 'START_MENU';
+        score = 0;
+        currentQuestion = 0;
+        isNoCameraMode = false;
+        document.getElementById('restartBtn').style.display = 'none';
+        document.getElementById('endBtn').style.display = 'none';
+    }
+
     function toggleMute() {
         let music = document.getElementById('bgMusic');
         let btn = document.getElementById('muteBtn');
-        if (music.paused) { music.play(); btn.innerText = "🔊 Mute"; btn.style.background = "#ef4444"; } 
-        else { music.pause(); btn.innerText = "🔇 Play"; btn.style.background = "#10b981"; }
+        if (music.paused) { music.play(); btn.innerText = "🔊 Mute"; btn.style.background = "#ef4444";
+        } 
+        else { music.pause(); btn.innerText = "🔇 Play"; btn.style.background = "#10b981";
+        }
     }
     
     function restartGame() {
-        score = 0; currentQuestion = 0; fireworks = []; 
+        score = 0;
+        currentQuestion = 0; fireworks = []; 
         smoothedSensorPos = [width / 2, height + 200];
         isFeedbackState = false;
         document.getElementById('bgMusic').currentTime = 0;
@@ -398,7 +404,8 @@
     }
     
     function forceEndGame() {
-        state = 'END'; currentQuestion = maxQuestions; fireworks = [];
+        state = 'END';
+        currentQuestion = maxQuestions; fireworks = [];
         document.getElementById('bgMusic').pause();
         if (isNoCameraMode) {
             document.getElementById('finalScore').innerText = score;
@@ -426,11 +433,12 @@
                 image(bgNormalImage, 0, 0, width, height);
                 fill(0, 0, 0, 80); rect(0, 0, width, height); 
             } else {
-                background('#1e293b'); 
+                background('#1e293b');
             }
         } else if (video) {
-            push(); translate(width, 0); scale(-1, 1); image(video, 0, 0, width, height); pop();
-            fill(0, 0, 0, 150); rect(0, 0, width, height); 
+            push();
+            translate(width, 0); scale(-1, 1); image(video, 0, 0, width, height); pop();
+            fill(0, 0, 0, 150); rect(0, 0, width, height);
         }
 
         if (state === 'START_MENU') {
@@ -474,10 +482,9 @@
 
         let hoverLeft = (mouseX > leftBtnX - boxW/2 && mouseX < leftBtnX + boxW/2 && mouseY > btnY - boxH/2 && mouseY < btnY + boxH/2);
         let hoverRight = (mouseX > rightBtnX - boxW/2 && mouseX < rightBtnX + boxW/2 && mouseY > btnY - boxH/2 && mouseY < btnY + boxH/2);
-
         rectMode(CENTER); noStroke();
 
-        fill(10, 110, 65); rect(leftBtnX, btnY + 10, boxW, boxH, 20); 
+        fill(10, 110, 65); rect(leftBtnX, btnY + 10, boxW, boxH, 20);
         if (hoverLeft) {
             fill(25, 215, 150);
             rect(leftBtnX, btnY + 4, boxW, boxH, 20); 
@@ -491,7 +498,8 @@
         text('(ขยับร่างกายตอบ)', leftBtnX, btnY + 25 + (hoverLeft ? 4 : 0));
 
         textStyle(BOLD);
-        fill(25, 75, 170); rect(rightBtnX, btnY + 10, boxW, boxH, 20); 
+        fill(25, 75, 170);
+        rect(rightBtnX, btnY + 10, boxW, boxH, 20); 
         if (hoverRight) {
             fill(80, 165, 255);
             rect(rightBtnX, btnY + 4, boxW, boxH, 20); 
@@ -504,7 +512,7 @@
         textSize(16); textStyle(NORMAL);
         text('(ใช้นิ้วจิ้ม/เมาส์คลิก)', rightBtnX, btnY + 25 + (hoverRight ? 4 : 0));
         
-        rectMode(CORNER); 
+        rectMode(CORNER);
     }
 
     function runCountdownLogic() {
@@ -532,17 +540,17 @@
 
         if (isFeedbackState) {
             if (millis() > feedbackTimer) {
-                nextQuestion(); 
+                nextQuestion();
             }
-            return; 
+            return;
         }
 
         timeLeft -= dt;
-        if (timeLeft <= 0) { playSound('wrong'); nextQuestion(); return; }
+        if (timeLeft <= 0) { playSound('wrong'); nextQuestion(); return;
+        }
 
         let active = false;
         let sensorPos = [0, 0];
-
         if (isNoCameraMode) {
             if (touches.length > 0) {
                 sensorPos = [touches[0].x, touches[0].y];
@@ -556,7 +564,8 @@
             let rw = poses[0].pose.rightWrist;
             
             if (lw.confidence > 0.4 || rw.confidence > 0.4) {
-                let activeWrist = (lw.confidence > rw.confidence) ? lw : rw;
+                let activeWrist = (lw.confidence > rw.confidence) ?
+                lw : rw;
                 sensorPos = [width - activeWrist.x, activeWrist.y - 150]; 
                 active = true;
             }
@@ -572,16 +581,16 @@
             }
 
             if (millis() < questionStartTime) return;
-
             for (let i = 0; i < 3; i++) {
-                let hitW = currentChoices[i].hitW || 120;
+                let hitW = currentChoices[i].hitW ||
+                120;
                 let hitH = currentChoices[i].hitH || 60;
                 
                 if (abs(smoothedSensorPos[0] - currentChoices[i].cx) < hitW && abs(smoothedSensorPos[1] - currentChoices[i].cy) < hitH) { 
                     selectedButtonIndex = i;
-                    
                     if (currentChoices[i].word === targetWord.word) {
-                        score++; playSound('correct');
+                        score++;
+                        playSound('correct');
                         isCorrectAnswer = true;
                     } else {
                         playSound('wrong');
@@ -597,9 +606,9 @@
     }
 
     function drawGameUI() {
-        fill(255); textAlign(LEFT, TOP); textSize(24); textStyle(BOLD); text(`Score: ${score}`, 20, 90); 
+        fill(255);
+        textAlign(LEFT, TOP); textSize(24); textStyle(BOLD); text(`Score: ${score}`, 20, 90); 
         textAlign(RIGHT, TOP); text(`${currentQuestion} / ${maxQuestions}`, width - 20, 90);
-        
         let seconds = Math.ceil(timeLeft / 1000);
         textAlign(CENTER, TOP); textSize(30); fill(255); text(`Time: ${seconds}s`, width/2, 90);
 
@@ -609,16 +618,16 @@
             image(img, width/2, height - 130, 180, 180); 
             imageMode(CORNER);
         } else {
-            textAlign(CENTER, CENTER); textSize(40); fill(255, 255, 255, 150);
+            textAlign(CENTER, CENTER);
+            textSize(40); fill(255, 255, 255, 150);
             text("[ รูป " + targetWord.word + ".png ]", width/2, height - 130);
         }
 
-        let screenPadding = width * 0.05; 
+        let screenPadding = width * 0.05;
         let boxW = min(200, width * 0.26); 
         let boxH = min(70, height * 0.12);
-        
         let availableWidth = width - (screenPadding * 2);
-        let gap = (availableWidth - (boxW * 3)) / 2; 
+        let gap = (availableWidth - (boxW * 3)) / 2;
         let startX = screenPadding; 
 
         for (let i = 0; i < 3; i++) {
@@ -627,7 +636,7 @@
             
             currentChoices[i].cx = cx; 
             currentChoices[i].cy = cy;
-            currentChoices[i].hitW = boxW / 2 + 30; 
+            currentChoices[i].hitW = boxW / 2 + 30;
             currentChoices[i].hitH = boxH / 2 + 30;
 
             rectMode(CENTER); 
@@ -645,21 +654,23 @@
 
             if (isFeedbackState && i === selectedButtonIndex) {
                 if (isCorrectAnswer) {
-                    fill(46, 204, 113); 
+                    fill(46, 204, 113);
                 } else {
-                    fill(231, 76, 60); 
+                    fill(231, 76, 60);
                 }
             } else {
-                fill(255, 255, 255, 240); 
+                fill(255, 255, 255, 240);
             }
             
-            stroke(0); strokeWeight(2);
+            stroke(0);
+            strokeWeight(2);
             rect(cx, cy, boxW, boxH, 15);
 
             if (isFeedbackState && i === selectedButtonIndex) fill(255);
             else fill(0);
             
-            noStroke(); textSize(min(24, boxW * 0.18)); textAlign(CENTER, CENTER);
+            noStroke(); textSize(min(24, boxW * 0.18));
+            textAlign(CENTER, CENTER);
             text(currentChoices[i].word.toUpperCase(), cx, cy);
             rectMode(CORNER);
         }
@@ -672,7 +683,8 @@
             fill(255, 50, 50, 200); noStroke();
             circle(px, py, 15);
             
-            stroke(255, 50, 50, 200); strokeWeight(3);
+            stroke(255, 50, 50, 200);
+            strokeWeight(3);
             line(px - 20, py, px + 20, py);
             line(px, py - 20, px, py + 20);
             pop();
@@ -680,23 +692,29 @@
     }
 
     function drawUI(t1, t2, size, x, y, c = '#38bdf8') {
-        textAlign(CENTER, CENTER); textStyle(BOLD);
+        textAlign(CENTER, CENTER);
+        textStyle(BOLD);
         fill(c); textSize(size); text(t1, x, y - 30); fill(255); textSize(20); text(t2, x, y + 40);
     }
 
     function shuffle(array) {
         let currentIndex = array.length, randomIndex;
         while (currentIndex !== 0) {
-            randomIndex = Math.floor(Math.random() * currentIndex); currentIndex--;
+            randomIndex = Math.floor(Math.random() * currentIndex);
+            currentIndex--;
             [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
         }
         return array;
     }
 
     class Particle {
-        constructor(x, y, c) { this.x = x; this.y = y; this.vx = random(-5, 5); this.vy = random(-5, 5); this.alpha = 255; this.c = c; }
-        update() { this.x += this.vx; this.y += this.vy; this.alpha -= 5; }
-        show() { noStroke(); fill(this.c[0], this.c[1], this.c[2], this.alpha); ellipse(this.x, this.y, 8); }
+        constructor(x, y, c) { this.x = x;
+            this.y = y; this.vx = random(-5, 5); this.vy = random(-5, 5); this.alpha = 255; this.c = c;
+        }
+        update() { this.x += this.vx; this.y += this.vy; this.alpha -= 5;
+        }
+        show() { noStroke(); fill(this.c[0], this.c[1], this.c[2], this.alpha); ellipse(this.x, this.y, 8);
+        }
     }
     
     function runFireworks() {
@@ -706,7 +724,8 @@
             for(let i=0; i<30; i++) fireworks.push(new Particle(x, y, c));
         }
         for (let i = fireworks.length - 1; i >= 0; i--) {
-            fireworks[i].update(); fireworks[i].show();
+            fireworks[i].update();
+            fireworks[i].show();
             if (fireworks[i].alpha <= 0) fireworks.splice(i, 1);
         }
     }
