@@ -87,7 +87,6 @@
     </div>
 
 <script>
-    // === ลิงก์เชื่อมโยงไปยัง Google Apps Script Web App ของคุณคุณครู ===
     const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxd_UGE1ZY_1dcB3B7l0Vy8azxhuuFoc_kftJ7QZ1Nc4XIaXGKF9RPs8WxhZ0K5VyVN/exec';
     const LESSON_NAME = "My Body Part Game (Normal Mode)";
 
@@ -124,7 +123,6 @@
     ];
     let osc, env, fireworks = [];
 
-    // เรียกโหลดความจำเก่าของนักเรียนตั้งแต่เปิดหน้าเว็บขึ้นมา
     window.onload = function() {
         if(localStorage.getItem('studentName')) {
             studentData.name = localStorage.getItem('studentName');
@@ -137,13 +135,11 @@
             document.getElementById('welcome-section').style.display = 'block';
         }
 
-        // ฝังฟังก์ชันจัดฟอร์แมตห้องอัตโนมัติ (Smart Auto-Format) เมื่อเมาส์คลิกออกจากช่องกรอกห้อง
         document.getElementById('m_room').addEventListener('blur', function() {
             this.value = autoFormatRoom(this.value);
         });
     };
 
-    // ฟังก์ชันสำหรับปุ่มสลับบัญชีผู้ใช้
     function logoutUser() {
         let confirmLogout = confirm("ต้องการเปลี่ยนชื่อผู้เล่นใช่ไหมครับ?\n\nระบบจะลบข้อมูลเดิมออก และระบบจะให้กรอกชื่อใหม่หลังเล่นจบครับ");
         if (confirmLogout) {
@@ -154,7 +150,6 @@
         }
     }
 
-    // ตัวแปลงฟอร์แมตห้องอัจฉริยะดึงเฉพาะตัวเลขมาเรียงเป็น ม.X/Y
     function autoFormatRoom(val) {
         let cleanVal = val.trim();
         let numbers = cleanVal.match(/\d+/g);
@@ -242,7 +237,6 @@
             state = 'END';
             if (score >= maxQuestions / 2) playSound('win');
             
-            // --- เงื่อนไขการส่งคะแนนเข้า Google Sheet (เฉพาะโหมดปิดกล้องปกติ) ---
             if (isNoCameraMode) {
                 document.getElementById('finalScore').innerText = score;
                 if (studentData.id) {
@@ -280,7 +274,6 @@
     }
 
     function mousePressed(event) {
-        // บล็อกไม่ให้ P5 ตรวจจับการคลิกทะลุลงไปโดนปุ่ม HTML ของระบบส่งคะแนน
         if (event && event.target && (event.target.tagName === 'BUTTON' || event.target.tagName === 'INPUT')) return;
         userStartAudio(); 
         
@@ -291,18 +284,51 @@
             mousePressedOnMenu(cx, cy);
             document.getElementById('bgMusic').play().catch(e => console.log(e));
         } else if (state === 'END') { 
-            // โหมด AR คลิกเพื่อเริ่มใหม่ได้ปกติ แต่โหมดส่งคะแนนจะทำงานผ่านปุ่มของ Modal แทน
             if (!isNoCameraMode) restartGame();
         }
     }
 
-    // ฟังก์ชันจัดการบันทึกข้อมูลและแปลงฟอร์แมตห้องเมื่อกดปุ่มยืนยัน
+    // ฟังก์ชันอัปเดตตำแหน่งเซ็นเซอร์ (แยกออกมาเพื่อให้ทำงานตลอดเวลา)
+    function updateSensorPosition() {
+        let active = false;
+        let sPos = [0, 0];
+        
+        if (isNoCameraMode) {
+            if (touches.length > 0) {
+                sPos = [touches[0].x, touches[0].y];
+                active = true;
+            } else if (mouseIsPressed) {
+                sPos = [mouseX, mouseY];
+                active = true;
+            }
+        } else if (poses.length > 0) {
+            let lw = poses[0].pose.leftWrist;
+            let rw = poses[0].pose.rightWrist;
+            if (lw.confidence > 0.4 || rw.confidence > 0.4) {
+                let activeWrist = (lw.confidence > rw.confidence) ? lw : rw;
+                sPos = [width - activeWrist.x, activeWrist.y - 150]; 
+                active = true;
+            }
+        }
+
+        if (active) {
+            if (isNoCameraMode) {
+                smoothedSensorPos[0] = sPos[0];
+                smoothedSensorPos[1] = sPos[1];
+            } else {
+                smoothedSensorPos[0] = lerp(smoothedSensorPos[0], sPos[0], 0.3);
+                smoothedSensorPos[1] = lerp(smoothedSensorPos[1], sPos[1], 0.3);
+            }
+        }
+        return active;
+    }
+
     function saveModalData() {
         let n = document.getElementById('m_name').value.trim();
         let r = document.getElementById('m_room').value.trim();
         let i = document.getElementById('m_id').value.trim();
         let err = document.getElementById('modal-err');
-        // รันฟอร์แมตห้องซ้ำอีกรอบเพื่อความชัวร์ 100% ก่อนส่งข้อมูลลงระบบ
+        
         r = autoFormatRoom(r);
         document.getElementById('m_room').value = r;
         if(!n || !r || i.length !== 5) {
@@ -328,7 +354,6 @@
         submitGameScore();
     }
 
-    // สคริปต์ยิงข้อมูลคะแนนเข้าสู่ระบบ Google Sheets แบบ no-cors
     async function submitGameScore() {
         let stat = document.getElementById('saveStatus');
         let playBtn = document.getElementById('playAgainBtn');
@@ -371,7 +396,6 @@
         restartGame();
     }
 
-    // ฟังก์ชันพาผู้เล่นกลับหน้าเมนูหลักอย่างปลอดภัย ไม่เกิดการส่งคะแนนซ้ำ
     function goToMainMenu() {
         document.getElementById('scoreModal').classList.remove('active');
         document.getElementById('saveStatus').style.display = 'none';
@@ -516,6 +540,7 @@
     }
 
     function runCountdownLogic() {
+        updateSensorPosition(); // ให้จับเป้าตั้งแต่นับถอยหลัง
         if (millis() > countdownTimer) {
             countdownNum--;
             countdownTimer = millis() + 1000;
@@ -532,11 +557,11 @@
         fill('#f59e0b');
         textSize(120);
         text(countdownNum, width/2, height/2);
+        drawSensorCrosshair(); // โชว์เป้าเล็งรอก่อนเริ่ม
     }
 
     function runGameLogic() {
-        let dt = millis() - lastTime;
-        lastTime = millis();
+        let isActive = updateSensorPosition();
 
         if (isFeedbackState) {
             if (millis() > feedbackTimer) {
@@ -545,45 +570,14 @@
             return;
         }
 
+        let dt = millis() - lastTime;
+        lastTime = millis();
         timeLeft -= dt;
-        if (timeLeft <= 0) { playSound('wrong'); nextQuestion(); return;
-        }
+        if (timeLeft <= 0) { playSound('wrong'); nextQuestion(); return; }
 
-        let active = false;
-        let sensorPos = [0, 0];
-        if (isNoCameraMode) {
-            if (touches.length > 0) {
-                sensorPos = [touches[0].x, touches[0].y];
-                active = true;
-            } else if (mouseIsPressed) {
-                sensorPos = [mouseX, mouseY];
-                active = true;
-            }
-        } else if (poses.length > 0) {
-            let lw = poses[0].pose.leftWrist;
-            let rw = poses[0].pose.rightWrist;
-            
-            if (lw.confidence > 0.4 || rw.confidence > 0.4) {
-                let activeWrist = (lw.confidence > rw.confidence) ?
-                lw : rw;
-                sensorPos = [width - activeWrist.x, activeWrist.y - 150]; 
-                active = true;
-            }
-        }
-
-        if (active) {
-            if (isNoCameraMode) {
-                smoothedSensorPos[0] = sensorPos[0];
-                smoothedSensorPos[1] = sensorPos[1];
-            } else {
-                smoothedSensorPos[0] = lerp(smoothedSensorPos[0], sensorPos[0], 0.3);
-                smoothedSensorPos[1] = lerp(smoothedSensorPos[1], sensorPos[1], 0.3);
-            }
-
-            if (millis() < questionStartTime) return;
+        if (isActive && millis() >= questionStartTime) {
             for (let i = 0; i < 3; i++) {
-                let hitW = currentChoices[i].hitW ||
-                120;
+                let hitW = currentChoices[i].hitW || 120;
                 let hitH = currentChoices[i].hitH || 60;
                 
                 if (abs(smoothedSensorPos[0] - currentChoices[i].cx) < hitW && abs(smoothedSensorPos[1] - currentChoices[i].cy) < hitH) { 
@@ -602,6 +596,22 @@
                     return; 
                 }
             }
+        }
+    }
+
+    // ฟังก์ชันวาดเป้าเล็งสีแดง
+    function drawSensorCrosshair() {
+        if (!isNoCameraMode && smoothedSensorPos[1] < height) {
+            push();
+            let px = smoothedSensorPos[0];
+            let py = smoothedSensorPos[1];
+            fill(255, 50, 50, 200); noStroke();
+            circle(px, py, 15);
+            stroke(255, 50, 50, 200);
+            strokeWeight(3);
+            line(px - 20, py, px + 20, py);
+            line(px, py - 20, px, py + 20);
+            pop();
         }
     }
 
@@ -674,21 +684,7 @@
             text(currentChoices[i].word.toUpperCase(), cx, cy);
             rectMode(CORNER);
         }
-
-        if (!isNoCameraMode && smoothedSensorPos[1] < height) {
-            push();
-            let px = smoothedSensorPos[0];
-            let py = smoothedSensorPos[1];
-            
-            fill(255, 50, 50, 200); noStroke();
-            circle(px, py, 15);
-            
-            stroke(255, 50, 50, 200);
-            strokeWeight(3);
-            line(px - 20, py, px + 20, py);
-            line(px, py - 20, px, py + 20);
-            pop();
-        }
+        drawSensorCrosshair();
     }
 
     function drawUI(t1, t2, size, x, y, c = '#38bdf8') {
