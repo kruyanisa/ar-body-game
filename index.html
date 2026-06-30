@@ -13,20 +13,17 @@
         #game-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; }
         canvas { display: block; touch-action: none; }
         
-        /* ปุ่มควบคุมหลัก */
         .btn { position: absolute; z-index: 10; padding: 10px 15px; font-size: 14px; font-weight: bold; border-radius: 8px; color: white; border: none; cursor: pointer; font-family: 'Sarabun', sans-serif; transition: 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         .btn:hover { transform: scale(1.05); }
         #muteBtn { top: 20px; left: 20px; background: #ef4444; }
         #restartBtn { top: 20px; right: 135px; background: #3b82f6; }
         #endBtn { top: 20px; right: 20px; background: #64748b; }
 
-        /* แถบแสดงข้อมูลผู้เล่นด้านบน */
         .header-container { position: absolute; top: 18px; left: 130px; z-index: 10; font-family: 'Sarabun'; }
         .welcome-text { font-size: 14px; font-weight: bold; color: #3730a3; background: rgba(224, 231, 255, 0.9); padding: 8px 18px; border-radius: 50px; border: 1px solid #c7d2fe; display: flex; align-items: center; gap: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         .logout-btn { cursor: pointer; border: none; background: #ef4444; color: white; border-radius: 5px; padding: 2px 10px; font-size: 12px; transition: 0.2s; }
         .logout-btn:hover { background: #b91c1c; }
 
-        /* Modal ลงชื่อ ( Login ) */
         #login-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(30, 41, 59, 0.9); backdrop-filter: blur(5px); z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; display: none; }
         .modal-box-login { background: white; padding: 30px; border-radius: 25px; width: 85%; max-width: 380px; box-shadow: 0 15px 40px rgba(0,0,0,0.4); border: 3px solid #6366f1; text-align: center; }
         .modal-box-login h2 { margin-top: 0; color: #4f46e5; font-size: 26px; }
@@ -35,7 +32,6 @@
         .modal-box-login button { width: 100%; padding: 14px; background: #6366f1; color: white; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 0 #4338ca; }
         .modal-box-login button:hover { background: #4f46e5; transform: translateY(-2px); }
 
-        /* Modal สรุปคะแนน ( Score ) */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.95); display: flex; justify-content: center; align-items: center; z-index: 1999; visibility: hidden; opacity: 0; transition: opacity 0.3s; backdrop-filter: blur(5px); }
         .modal-overlay.active { visibility: visible; opacity: 1; }
         .modal-box { background: white; padding: 40px; border-radius: 30px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.5); max-width: 380px; width: 90%; border: 5px solid #a5b4fc; font-family: 'Sarabun'; }
@@ -88,7 +84,6 @@
     </div>
 
 <script>
-    // === การตั้งค่าระบบส่งคะแนน (Google Apps Script) ===
     const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxd_UGE1ZY_1dcB3B7l0Vy8azxhuuFoc_kftJ7QZ1Nc4XIaXGKF9RPs8WxhZ0K5VyVN/exec';
     const LESSON_NAME = "Body Part Game (Normal Mode)";
 
@@ -113,7 +108,6 @@
 
     let osc, env, fireworks = [];
 
-    // --- จัดการข้อมูลผู้เล่นและระบบ Auto-Format ---
     window.onload = function() {
         if(localStorage.getItem('studentName')) {
             studentData.name = localStorage.getItem('studentName');
@@ -141,10 +135,8 @@
         document.getElementById('welcome-section').style.display = 'block';
     }
 
-function logoutUser() {
-        // เพิ่มประโยคที่ต้องการลงไปในกล่องข้อความ
+    function logoutUser() {
         let confirmLogout = confirm("ต้องการเปลี่ยนชื่อผู้เล่นใช่ไหมครับ?\n\nระบบจะลบข้อมูลเดิมออก และระบบจะให้กรอกชื่อใหม่หลังเล่นจบครับ");
-        
         if (confirmLogout) {
             localStorage.removeItem('studentName');
             localStorage.removeItem('studentRoom');
@@ -153,7 +145,6 @@ function logoutUser() {
         }
     }
 
-    // --- ระบบเกม P5.js ---
     function preload() {
         vocabList.forEach(v => vocabImages[v.word] = loadImage(v.word + '.png'));
         bgMenuImage = loadImage('bg_menu.jpg'); 
@@ -244,7 +235,6 @@ function logoutUser() {
         } else if (state === 'END' && !isNoCameraMode) { restartGame(); }
     }
 
-    // --- ระบบส่งคะแนน ---
     function saveModalData() {
         let n = document.getElementById('m_name').value.trim();
         let r = autoFormatRoom(document.getElementById('m_room').value);
@@ -295,7 +285,7 @@ function logoutUser() {
 
     function forceEndGame() {
         state = 'END'; currentQuestion = maxQuestions; document.getElementById('bgMusic').pause();
-        if (isNoCameraMode) nextQuestion(); // กระตุ้นหน้าจอส่งคะแนน
+        if (isNoCameraMode) nextQuestion(); 
     }
 
     function toggleMute() {
@@ -304,7 +294,6 @@ function logoutUser() {
         else { m.pause(); document.getElementById('muteBtn').innerText = "🔇 Play"; }
     }
 
-    // --- วาดหน้าจอ ---
     function draw() {
         if (state === 'START_MENU' || state === 'LOADING_CAMERA') {
             if (bgMenuImage) image(bgMenuImage, 0, 0, width, height);
@@ -331,47 +320,28 @@ function logoutUser() {
 
         let boxW = min(300, width * 0.4), boxH = 150;
         let lX = width/2 - boxW/2 - 20, rX = width/2 + boxW/2 + 20, bY = height/2 + 50;
+        
+        let isHoverLeft = (mouseX > lX - boxW/2 && mouseX < lX + boxW/2 && mouseY > bY - boxH/2 && mouseY < bY + boxH/2);
+        let isHoverRight = (mouseX > rX - boxW/2 && mouseX < rX + boxW/2 && mouseY > bY - boxH/2 && mouseY < bY + boxH/2);
 
         rectMode(CENTER); noStroke();
-        // ปุ่ม AR
-        fill(hoverLeft ? 25, 215, 150 : 16, 185, 129); // เปลี่ยนสีเมื่อชี้
-        if (mouseIsPressed && hoverLeft) {
-            fill(10, 110, 65); // เปลี่ยนสีเมื่อกด
-            rect(lX, bY+10, boxW, boxH, 20); // วาดฐานนูน
-            fill(16, 185, 129); // ตัวปุ่มปกติ
-            rect(lX, bY+4, boxW, boxH, 20); // ตัวปุ่มยุบลงเล็กน้อย
-        } else {
-            fill(10, 110, 65); rect(lX, bY+10, boxW, boxH, 20); // ฐานนูนปกติ
-            fill(hoverLeft ? 25, 215, 150 : 16, 185, 129); rect(lX, bY, boxW, boxH, 20); // ปุ่มปกติ
-        }
-        fill(255); textSize(24); text('เล่นเปิดกล้อง', lX, bY-15 + (mouseIsPressed && hoverLeft ? 4 : 0)); // ตัวหนังสือเลื่อน
-        textSize(16); textStyle(NORMAL); text('(ขยับร่างกาย)', lX, bY+25 + (mouseIsPressed && hoverLeft ? 4 : 0));
+        
+        // ปุ่มซ้าย
+        fill(10, 110, 65); rect(lX, bY+10, boxW, boxH, 20);
+        fill(isHoverLeft ? color(25, 215, 150) : color(16, 185, 129)); 
+        rect(lX, bY + (mouseIsPressed && isHoverLeft ? 4 : 0), boxW, boxH, 20);
+        fill(255); textSize(24); text('เล่นเปิดกล้อง', lX, bY-15 + (mouseIsPressed && isHoverLeft ? 4 : 0));
+        textSize(16); textStyle(NORMAL); text('(ขยับร่างกาย)', lX, bY+25 + (mouseIsPressed && isHoverLeft ? 4 : 0));
 
-        // ปุ่มปกติ
-        textStyle(BOLD); fill(hoverRight ? 80, 165, 255 : 59, 130, 246);
-        if (mouseIsPressed && hoverRight) {
-            fill(25, 75, 170); rect(rX, bY+10, boxW, boxH, 20);
-            fill(59, 130, 246); rect(rX, bY+4, boxW, boxH, 20);
-        } else {
-            fill(25, 75, 170); rect(rX, bY+10, boxW, boxH, 20);
-            fill(hoverRight ? 80, 165, 255 : 59, 130, 246); rect(rX, bY, boxW, boxH, 20);
-        }
-        fill(255); textSize(24); text('เล่นปิดกล้อง', rX, bY-15 + (mouseIsPressed && hoverRight ? 4 : 0));
-        textSize(16); textStyle(NORMAL); text('(จิ้มหน้าจอ)', rX, bY+25 + (mouseIsPressed && hoverRight ? 4 : 0));
+        // ปุ่มขวา
+        textStyle(BOLD); 
+        fill(25, 75, 170); rect(rX, bY+10, boxW, boxH, 20);
+        fill(isHoverRight ? color(80, 165, 255) : color(59, 130, 246)); 
+        rect(rX, bY + (mouseIsPressed && isHoverRight ? 4 : 0), boxW, boxH, 20);
+        fill(255); textSize(24); text('เล่นปิดกล้อง', rX, bY-15 + (mouseIsPressed && isHoverRight ? 4 : 0));
+        textSize(16); textStyle(NORMAL); text('(จิ้มหน้าจอ)', rX, bY+25 + (mouseIsPressed && isHoverRight ? 4 : 0));
+        
         rectMode(CORNER);
-    }
-
-    // ฟังก์ชันเพิ่มเติมสำหรับระบบ Hover ของ P5 (ml5.js)
-    function hoverLeft() {
-        let boxW = min(300, width * 0.4), boxH = 150;
-        let lX = width/2 - boxW/2 - 20, bY = height/2 + 50;
-        return (mouseX > lX - boxW/2 && mouseX < lX + boxW/2 && mouseY > bY - boxH/2 && mouseY < bY + boxH/2);
-    }
-
-    function hoverRight() {
-        let boxW = min(300, width * 0.4), boxH = 150;
-        let rX = width/2 + boxW/2 + 20, bY = height/2 + 50;
-        return (mouseX > rX - boxW/2 && mouseX < rX + boxW/2 && mouseY > bY - boxH/2 && mouseY < bY + boxH/2);
     }
 
     function runCountdown() {
@@ -399,7 +369,7 @@ function logoutUser() {
                 let c = currentChoices[i];
                 if (abs(smoothedSensorPos[0] - c.cx) < c.hitW && abs(smoothedSensorPos[1] - c.cy) < c.hitH) {
                     selectedButtonIndex = i; isCorrectAnswer = (c.word === targetWord.word);
-                    if(isFeedbackState) return; // บล็อกการกดซ้ำซ้อน
+                    if(isFeedbackState) return;
                     playSound(isCorrectAnswer ? 'correct' : 'wrong');
                     isFeedbackState = true; feedbackTimer = millis() + 1500; break;
                 }
